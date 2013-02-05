@@ -176,7 +176,7 @@ void Info::init_random_seed(int randomSeed)
 		random_seed = randomSeed;
 	else
 	{
-		randomSeed = time(NULL);
+		randomSeed = (int)time(NULL);		// Implicit cast provokes warning. FIXED by explicit cast.
 		randomSeed = (int) _rotr( randomSeed, 4 );
 		if( randomSeed < 0 )
 			randomSeed = ~randomSeed;

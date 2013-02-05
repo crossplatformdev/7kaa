@@ -828,7 +828,9 @@ int Nation::think_attack_enemy_firm(int enemyNationRecno, int firmId)
 	Town*   ourLargestTown = town_array[largest_town_recno];
 	Nation  *nationPtr = nation_array[enemyNationRecno];
 	Firm    *firmPtr, *targetFirm=NULL;
-	int     curRating, bestRating=0, targetCombatLevel, hasWar;
+	int     curRating, bestRating=0, targetCombatLevel;
+	int		hasWar = 0; //Fixes random crash that occurs when its used before initialised.
+
 
 	for( int i=firm_array.size() ; i>0 ; i-- )
 	{
@@ -1006,7 +1008,7 @@ int Nation::think_against_mine_monopoly()
 
 		//--------------------------------------------//
 
-		int hasWar;
+		int hasWar = 0; //Fixes random crash that occurs when its used before initialised.
 		int targetCombatLevel = enemy_firm_combat_level(firmPtr, 1, hasWar);
 
 		return ai_attack_target( firmPtr->loc_x1, firmPtr->loc_y1,

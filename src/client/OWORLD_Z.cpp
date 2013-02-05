@@ -902,7 +902,7 @@ void ZoomMatrix::draw_god_cast_range()
 
 	int   	 xLoc, yLoc, centerY, t;
 	int		 x1, y1, x2, y2;
-	Location* locPtr;
+	Location* locPtr = NULL;	// Avoids warning when locPtr++
 
 	Unit* 	unitPtr = unit_array[power.command_unit_recno];
 	GodInfo*	godInfo = god_res[ ((UnitGod*)unitPtr)->god_id ];

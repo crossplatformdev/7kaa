@@ -41,7 +41,7 @@ bool write_le_integer(OutputStream *os, T val)
 
    for (int n = 0; n < static_cast<int>(sizeof(T)); n++)
    {
-      c = val >> (8 * n);
+      c = (unsigned char)(val >> (8 * n)); // Cast fixes possible loss of data.
 
       if (os->write(&c, 1) != 1)
 	 return false;

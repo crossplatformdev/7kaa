@@ -47,7 +47,7 @@ long MemInputStream::read(void *buffer, long length)
    if (this->data == NULL)
       return 0;
 
-   read_count = MIN(length, this->length - this->pos);
+   read_count = MIN(length,(long)(this->length - this->pos));		//Fixes warning comparing signed vs unsigned.
    memcpy(buffer, this->data + this->pos, read_count);
    this->pos += read_count;
 
@@ -66,7 +66,7 @@ bool MemInputStream::seek(long offset, int whence)
       default: return false;
    }
 
-   if (target < 0 || target >= this->length)
+   if (target < 0 || target >= (long)this->length)		//Fixes warning comparing signed vs unsigned.		
       return false;
 
    this->pos = target;

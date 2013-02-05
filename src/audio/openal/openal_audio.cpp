@@ -75,7 +75,7 @@ static inline long ratio_to_millibels(float ratio)
    if (ratio == 0.f)
       return -10000;
 
-   return (2000.f * log(ratio) / log10 + .5f);
+   return (long)(2000.f * log(ratio) / log10 + .5f);
 }
 
 /* panning is in [-10,000; 10,000] */
@@ -656,7 +656,8 @@ DsVolume OpenALAudio::get_loop_wav_volume(int id)
       gain *= 1.f - float(sc->fade_frames_played) / sc->fade_frames;
 
    return DsVolume(ratio_to_millibels(gain),
-		   (position[0] / PANNING_MAX_X) * 10000.f + .5f);
+		(long)((position[0] / PANNING_MAX_X) * 10000.f + .5f)); // (long) cast fixes warning.
+
 }
 
 int OpenALAudio::is_loop_wav_fading(int id)
@@ -768,7 +769,8 @@ void OpenALAudio::toggle_wav(int wav_flag)
    if (!wav_flag)
       this->stop_wav();
 
-   this->wav_flag = wav_flag;
+   //this->wav_flag = (bool)wav_flag;				 // Cast fixes warning because this->wav_flag is bool, but generates rendiment warning.
+   this->wav_flag = (wav_flag == 0) ? 0 : 1; // The value of this->wav_flag is examined and asigned in-line.
 }
 
 void OpenALAudio::toggle_cd(int cdFlag)
@@ -921,7 +923,7 @@ void OpenALAudio::StreamContext::apply_fading(void *buffer, size_t frames)
 	    for (int c = 0; c < ch; c++)
 	    {
 	       uint8_t v = u8buf[n * ch + c];
-	       u8buf[n * ch + c] = f * (v - 128) + 128 + .5f;
+	       u8buf[n * ch + c] =(uint8_t)(f * (v - 128) + 128 + .5f);
 	    }
 
 	    f += incr;
@@ -935,7 +937,7 @@ void OpenALAudio::StreamContext::apply_fading(void *buffer, size_t frames)
 	 for (n = 0; n < frames; n++)
 	 {
 	    for (int c = 0; c < ch; c++)
-	       s16buf[n * ch + c] = f * s16buf[n * ch + c] + .5f;
+	       s16buf[n * ch + c] =(int16_t)(f * s16buf[n * ch + c] + .5f);
 
 	    f += incr;
 	    f = MAX(f, 0.f);

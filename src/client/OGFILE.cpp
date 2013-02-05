@@ -442,7 +442,7 @@ int GameFile::write_game_header(File* filePtr)
 #ifndef NO_WINDOWS  // FIXME
 	//----- set the file date ------//
 
-	CoFileTimeNow(&file_date);
+	//CoFileTimeNow(&file_date); // Cant call funtion, is not declarated.
 #endif
 
 	//------- write GameFile to the saved game file -------//

@@ -194,7 +194,7 @@ void UnitMonster::king_leave_scroll()
 
 	int		 xOffset, yOffset;
 	int		 xLoc, yLoc;
-	Location* locPtr;
+	Location* locPtr = NULL;	//Possibly helps to prevent stack corruption around raceCountArray.
 	int		 curXLoc = next_x_loc(), curYLoc = next_y_loc();
 	BYTE	 	 regionId = world.get_region_id(curXLoc, curYLoc);
 	short		 raceCountArray[MAX_RACE];

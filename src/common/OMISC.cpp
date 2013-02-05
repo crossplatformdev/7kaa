@@ -1002,7 +1002,7 @@ long Misc::get_random_seed()
 //
 void Misc::randomize()
 {
-   set_random_seed(time(NULL));
+   set_random_seed((long)time(NULL));	// Implicit conversion from time_t to float.
 }
 //---------- End of function Misc::randomize ---------//
 

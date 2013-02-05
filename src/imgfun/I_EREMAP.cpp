@@ -81,7 +81,7 @@ void IMGremap16x16 (char *imageBuf, int pitch, int x, int y,  char* maskPtr, cha
 {
 	int offset = y*pitch + x;
 	int srcline = 0;
-	int al;
+	//int al;		// Unused variable.
 	char* table;
 	for (int j=0; j<16; ++j, offset+=pitch, srcline+=16)
 	{

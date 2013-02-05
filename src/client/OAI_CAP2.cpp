@@ -263,7 +263,7 @@ Town* Nation::think_capture_enemy_town_target(Town* capturerTown)
 	int   ourMilitary = military_rank_rating();
 	Nation* ownNation = nation_array[nation_recno];
 	int   bestRating = -1000;
-	int  	hasWar;
+	int   hasWar = 0; //Fixes random crash that occurs when its used before initialised.
 	int   neededCombatLevel=0;
 
 	for( townRecno=town_array.size() ; townRecno>0 ; townRecno-- )

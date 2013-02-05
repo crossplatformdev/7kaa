@@ -346,7 +346,7 @@ int MultiPlayer::msg_game_list(MsgGameList *m, int last_ack, struct inet_address
 		MSG("[MultiPlayer::poll_sessions] got beacon for game '%s'\n", desc->session_name);
 	}
 
-	if (m->total_pages >= last_ack)
+	if (m->total_pages >= (uint32_t)last_ack)		//Fixes warning comparing signed vs unsigned.
 		return 1;
 
 	return last_ack++;
@@ -560,7 +560,7 @@ void MultiPlayer::game_starting()
 void MultiPlayer::send_game_beacon()
 {
 	static uint32_t ticks = 0;
-	uint32_t player_id;
+	//uint32_t player_id;		// Local variable without reference (unused variable in this scope).
 	uint32_t cur_ticks;
 
 	cur_ticks = misc.get_time();
@@ -634,7 +634,7 @@ int MultiPlayer::add_player(char *name, uint32_t id)
 
 void MultiPlayer::set_my_player_id(uint32_t id)
 {
-	err_when(!id || id > max_players || !player_pool[id-1]);
+	err_when(!id || id > (uint32_t)max_players || !player_pool[id-1]);	//Fixes warning comparing signed vs unsigned.
 
 	my_player_id = id;
 }
@@ -651,9 +651,9 @@ void MultiPlayer::set_player_name(uint32_t id, char *name)
 //
 void MultiPlayer::delete_player(uint32_t id)
 {
-	err_when(id < 1 || id > max_players);
+	err_when(id < 1 || id > (uint32_t)max_players);
 	if (player_pool[id-1]) {
-		if (player_pool[id-1]->id == my_player_id && my_player)
+		if (player_pool[id-1]->id == my_player_id && my_player)			 //Fixes warning comparing signed vs unsigned.
 		{
 			my_player = NULL;
 		}
@@ -675,7 +675,7 @@ PlayerDesc *MultiPlayer::get_player(int i)
 
 PlayerDesc *MultiPlayer::search_player(uint32_t playerId)
 {
-	if (playerId < 1 || playerId > max_players)
+	if (playerId < 1 || playerId > (uint32_t)max_players)		 // Fixes warning comparing signed vs unsigned.
 		return NULL;
 	return player_pool[playerId-1];
 }
@@ -707,7 +707,7 @@ int MultiPlayer::get_player_id(struct inet_address *address)
 //
 int MultiPlayer::is_player_connecting(uint32_t playerId)
 {
-	if (playerId < 1 || playerId > max_players || !player_pool[playerId-1])
+	if (playerId < 1 || playerId > (uint32_t)max_players || !player_pool[playerId-1])	// Fixes warning comparing signed vs unsigned.
 		return 0;
 	return player_pool[playerId-1]->connecting;
 }
@@ -800,7 +800,7 @@ int MultiPlayer::send(uint32_t to, void * data, uint32_t msg_size)
 	int start;
 	int end;
 
-	err_when(to > max_players);
+	err_when(to > (uint32_t)max_players);			//Fixes warning comparing signed vs unsigned.
 
 	if (!game_sock)
 		return 0;
@@ -968,7 +968,7 @@ void MultiPlayer::udp_accept_connections(struct packet_header *h, struct inet_ad
 
 void MultiPlayer::set_peer_address(uint32_t who, struct inet_address *address)
 {
-	err_when(who < 1 || who > max_players);
+	err_when(who < 1 || who > (uint32_t)max_players);			//Fixes warning comparing signed vs unsigned.
 
 	if (who == my_player_id)
 		return;
