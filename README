@@ -1,24 +1,53 @@
 Seven Kingdoms: Ancient Adversaries
 -----------------------------------
 
-Release version 2.14.2
+Release version 2.14.4
 Project website: www.7kfans.com
 
-This is the release of the Seven Kingdoms: Ancient Adversaries source
-code as authorized by Enlight by the 7kfans project.  The game is
-provided under the terms of the GPL.  See the file "COPYING" for the
-details of the license.
+This is a GPL release of the Seven Kingdoms: Ancient Adversaries thanks to
+Enlight Software which granted the ability to license the game under a
+free and open source license in 2009. See the file "COPYING" for the
+details of the license. We are indebted to Enlight for making the 7kfans
+project possible and giving a new chance to build a community for fans
+of the game.
+
+Who should use this version of 7KAA?
+ * Any linux user.
+ * Anyone who wants to try the latest bugfixes.
+ * Anyone who likes the slightly improved game play.
+
+Who shouldn't use this version of 7KAA?
+ * Any multiplayer user under Windows. The new netcode, while it promises
+   actual cross-platform capatability, does not work well in lobby, nor
+   does not work on anything other than LAN (VPN okay) and 2 players. Please
+   use 2.13.xx series with DPlay instead if stability and full-features are
+   needed.
 
 Changes in this release:
- * New network support using SDL_net, directly replacing DirectPlay.
- * Fixed saved games with marine units on x86_64.
- * Fixed the diplomacy menu in the Plague scenario.
- * Added multiplayer connection progress dialogs.
- * Added command line switches for future external lobby support.
- * Fixed fullscreen toggle on Windows.
- * Fixed the jumpy mouse.
+ * Added the game data to the source tree.
+ * Added an NSIS install script.
+ * Started rewriting the lobby code to be UDP instead of TCP. It is not done
+   and does not work properly for >2 player or over anything but LAN. The game
+   port is now UDP 19255.
 
 Thanks to all who made this release possible.
+
+
+What you will find in this archive
+---------
+* The GPL source and data files.
+
+
+What you will NOT find in this archive
+---------
+* The original game music. The are provided in a separate package from 
+  7kfans.com. It is not under the GPL license, but it is free to download
+  and use with 7KAA.
+* The original translations resource file. This file was created by third
+  party distributors and Enlight does not have the right to distribute it.
+  This will be replaced by the 7kfans project.
+* Any other content from original game CDs, game manual including the version
+  2.12b game binary or older. This also includes the I*Magic Online service.
 
 
 Building the game
@@ -26,38 +55,22 @@ Building the game
 
 General Requirements
 * GCC 4.xx or later
-* Perl 5.8? or later (checked with 5.10.1)
 * SDL 1.2
 * SDL_net
 * OpenAL
+* Autoconf (when using git snapshot)
 
 
-We do not provide the typical Makefile setup. Building in Windows and
-Linux may be done in a shell, provided you have GCC (Mingw tested on
-Windows) and Perl installed. You will also need the development files
-to SDL and OpenAL installed. Once you have met the requirements to 
-compiling, build the game by executing the following commands:
-in a shell:
-perl configure.pl
-Followed by:
-perl build.pl
-
-If GNU Parallel is installed, jobs will automatically execute
-in parallel.
-
-If platform detection does not work for you, or you have build
-failures, please contact us.
-
-
-Running
+Installing
 --------
 You can download the game data if you do not already have the game
 installed. You can find the game data from the 7kfans sourceforge
 page at http://sourceforge.net/projects/skfans/
 
-Copy the executable file "7kaa*" from the src directory to your
-installed game directory.  Run the executable to start the game
-instead of the classic Enlight version called 7k.exe.  You may
-create a short-cut now.
+To patch the game:
+Copy the executable file "7kaa*" from the src/client directory to your
+installed game directory.  Run the 7kaa.exe executable to start the game
+instead of the classic Enlight version called 7k.exe.
 
+There are precompiled win32 install packages available.
 

@@ -42,7 +42,7 @@ Button::Button()
 	button_key   = 0;    // set by set_key()
 	use_texture_flag  = 0;
 
-	help_code[0] = NULL;
+	help_code[0] = '\0';
 
 	font_ptr = &font_san;
 }
@@ -55,7 +55,7 @@ void Button::set_help_code(const char* helpCode)
 {
 	strncpy( help_code, helpCode, HELP_CODE_LEN );
 
-	help_code[HELP_CODE_LEN] = NULL;
+	help_code[HELP_CODE_LEN] = '\0';
 }
 //--------- End of function Button::set_help_code --------//
 
@@ -188,7 +188,7 @@ void Button::create(int buttonType, int pX1, int pY1, int pX2, int pY2,
 			strLen = STR_BUF_LEN;
 
 		memcpy( str_buf, bodyPtr, strLen );
-		str_buf[strLen] = NULL;
+		str_buf[strLen] = '\0';
 	}
 	else
 		body_ptr = bodyPtr;
@@ -210,7 +210,7 @@ void Button::set_body(void* bodyPtr)
          strLen = STR_BUF_LEN;
 
       memcpy( str_buf, bodyPtr, strLen );
-      str_buf[strLen] = NULL;
+      str_buf[strLen] = '\0';
    }
    else
       body_ptr = bodyPtr;
@@ -400,7 +400,7 @@ int Button::detect(unsigned keyCode1, unsigned keyCode2, int detectRight, int su
 	//----- paint the button with pressed shape ------//
 
 	#define PRESSED_TIMEOUT_SECONDS  1      // 1 seconds
-	DWORD timeOutTime = m.get_time()+PRESSED_TIMEOUT_SECONDS*1000;
+	DWORD timeOutTime = misc.get_time()+PRESSED_TIMEOUT_SECONDS*1000;
 
 	if( elastic )
 	{
@@ -412,7 +412,7 @@ int Button::detect(unsigned keyCode1, unsigned keyCode2, int detectRight, int su
 			sys.yield();
 			mouse.get_event();
 
-			if( m.get_time() >= timeOutTime )
+			if( misc.get_time() >= timeOutTime )
 				break;
 		}
 
@@ -433,7 +433,7 @@ int Button::detect(unsigned keyCode1, unsigned keyCode2, int detectRight, int su
 			sys.yield();
 			mouse.get_event();
 
-			if( m.get_time() >= timeOutTime )
+			if( misc.get_time() >= timeOutTime )
 				break;
 		}
    }
@@ -456,7 +456,7 @@ void Button::wait_press(int timeOut)
 	#define INACTIVE_TIMEOUT_SECONDS  10      // 10 seconds
 
 	int   lastMouseX= -1, lastMouseY;
-	DWORD timeOutTime = m.get_time()+INACTIVE_TIMEOUT_SECONDS*1000;
+	DWORD timeOutTime = misc.get_time()+INACTIVE_TIMEOUT_SECONDS*1000;
 
 	mouse.get_event();			// clean up previous mouse events
 
@@ -472,14 +472,14 @@ void Button::wait_press(int timeOut)
 		{
 			if( lastMouseX == mouse.cur_x && lastMouseY == mouse.cur_y )
 			{
-				if( m.get_time() >= timeOutTime )
+				if( misc.get_time() >= timeOutTime )
 					break;
 			}
 			else
 			{
 				lastMouseX  = mouse.cur_x;
 				lastMouseY  = mouse.cur_y;
-				timeOutTime = m.get_time()+INACTIVE_TIMEOUT_SECONDS*1000; 
+				timeOutTime = misc.get_time()+INACTIVE_TIMEOUT_SECONDS*1000;
 			}
 		}
 	}

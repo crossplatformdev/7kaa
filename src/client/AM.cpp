@@ -60,7 +60,6 @@
 #include <OREBEL.h>
 #include <OREMOTE.h>
 #include <OSPATH.h>
-#include <OSPATHS2.h>
 #include <OSITE.h>
 #include <OSPREUSE.h>
 #include <OSPY.h>
@@ -91,7 +90,7 @@
 #include <OEXPMASK.h>
 #include <OREGION.h>
 #include <OWARPT.h>
-#include <netplay.h>
+#include <multiplayer.h>
 #include <OERRCTRL.h>
 #include <OMUSIC.h>
 #include <OLOG.h>
@@ -109,13 +108,8 @@
 
 //------- define game version constant --------//
 
-#ifdef AMPLUS
 	const char *GAME_VERSION_STR = SKVERSION;
 	const int GAME_VERSION = 212;	// Version 2.00, don't change it unless the format of save game files has been changed
-#else
-	const char *GAME_VERSION_STR = "1.11";
-	const int GAME_VERSION = 111;	// Version 1.00, don't change it unless the format of save game files has been changed
-#endif
 
 //-------- System class ----------//
 
@@ -126,7 +120,7 @@
 Error             err;              // constructor only call set_new_handler()d
 Mouse             mouse;
 MouseCursor       mouse_cursor;
-Misc              m, m2;
+Misc              misc, misc2;
 DateInfo          date;
 Vga               vga;
 VgaUtil           vga_util;
@@ -136,11 +130,10 @@ Video             video;
 #endif
 Audio             audio;
 Music             music;
-MultiPlayerType	mp_obj;
+MultiPlayer       mp_obj;
 Sys               sys;
 Translate         translate;        // constructor only memset()
 SeekPath          seek_path;
-SeekPathS2        seek_path_s2;
 SeekPathReuse     seek_path_reuse;
 Flame             flame[FLAME_GROW_STEP];
 Remote            remote;
@@ -171,12 +164,8 @@ ImageRes          image_icon, image_interface, image_menu,
 ImageRes          image_encyc;
 ImageRes				image_tpict;
 ImageRes				image_tutorial;
-#ifdef AMPLUS
 ImageRes				image_menu_plus;
 ImageRes&			image_menu2 = image_menu_plus;
-#else
-ImageRes&			image_menu2 = image_menu;
-#endif
 SpriteRes         sprite_res;
 SpriteFrameRes    sprite_frame_res;
 UnitRes           unit_res;
@@ -283,6 +272,23 @@ DBGLOG_DEFAULT_CHANNEL(am);
 
 static void extra_error_handler();
 
+/* Override obstinate SDL hacks */
+#ifdef __WINE__
+# ifdef main
+#   undef main
+# endif
+#endif
+
+#if (WIN32 && !USE_SDL)
+// Prototype main since the runtime does not do that for us
+int main(int, char**);
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+{
+	return main(__argc, __argv);
+}
+#endif
+
 //---------- Begin of function main ----------//
 //
 // Compilation constants:
@@ -355,7 +361,9 @@ int main(int argc, char **argv)
 #ifdef ENABLE_INTRO_VIDEO
 	//----------- play movie ---------------//
 
-	sys.set_game_dir();
+	if (!sys.set_game_dir())
+		return 1;
+
 	if (!lobbied)
 	{
 		String movieFileStr;
@@ -365,7 +373,7 @@ int main(int argc, char **argv)
 		video.set_skip_on_fail();
 
 		// ###### begin Gilbert 29/10 #####//
-		if( !m.is_file_exist("SKIPAVI.SYS") && m.is_file_exist(movieFileStr) )
+		if( !misc.is_file_exist("SKIPAVI.SYS") && misc.is_file_exist(movieFileStr) )
 		// ###### end Gilbert 29/10 #####//
 		{
 			//---------- play the movie now ---------//

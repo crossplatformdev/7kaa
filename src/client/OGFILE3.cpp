@@ -302,7 +302,7 @@ static void visit_unit(Visitor *v, Unit *u)
 //
 int Unit::write_file(File* filePtr)
 {
-	if (!write_with_record_size(filePtr, this, &visit_unit, 169))
+	if (!write_with_record_size(filePtr, this, &visit_unit<FileWriterVisitor>, 169))
 		return 0;
 
    //--------------- write memory data ----------------//
@@ -528,7 +528,7 @@ enum { UNIT_MARINE_DERIVED_RECORD_SIZE = 145 };
 //--------- Begin of function UnitMarine::read_derived_file ---------//
 int UnitMarine::read_derived_file(File* filePtr)
 {
-	if (!read_with_record_size(filePtr, this, &visit_unit_marine_derived,
+	if (!read_with_record_size(filePtr, this, &visit_unit_marine_derived<FileReaderVisitor>,
 										UNIT_MARINE_DERIVED_RECORD_SIZE))
 		return 0;
 
@@ -542,7 +542,7 @@ int UnitMarine::read_derived_file(File* filePtr)
 
 int UnitMarine::write_derived_file(File *filePtr)
 {
-	return write_with_record_size(filePtr, this, &visit_unit_marine_derived,
+	return write_with_record_size(filePtr, this, &visit_unit_marine_derived<FileWriterVisitor>,
 											UNIT_MARINE_DERIVED_RECORD_SIZE);
 }
 
@@ -705,7 +705,7 @@ enum { BULLET_RECORD_SIZE = 57 };
 //
 int Bullet::write_file(File* filePtr)
 {
-	return write_with_record_size(filePtr, this, &visit_bullet,
+	return write_with_record_size(filePtr, this, &visit_bullet<FileWriterVisitor>,
 											BULLET_RECORD_SIZE);
 }
 //----------- End of function Bullet::write_file ---------//
@@ -714,7 +714,7 @@ int Bullet::write_file(File* filePtr)
 //
 int Bullet::read_file(File* filePtr)
 {
-	if (!read_with_record_size(filePtr, this, &visit_bullet,
+	if (!read_with_record_size(filePtr, this, &visit_bullet<FileReaderVisitor>,
 										BULLET_RECORD_SIZE))
 		return 0;
 
@@ -779,13 +779,13 @@ enum { PROJECTILE_RECORD_SIZE = 72 };
 
 int Projectile::write_derived_file(File *filePtr)
 {
-	return write_with_record_size(filePtr, this, &visit_projectile,
+	return write_with_record_size(filePtr, this, &visit_projectile<FileWriterVisitor>,
 											PROJECTILE_RECORD_SIZE);
 }
 
 int Projectile::read_derived_file(File *filePtr)
 {
-	if (!read_with_record_size(filePtr, this, &visit_projectile,
+	if (!read_with_record_size(filePtr, this, &visit_projectile<FileReaderVisitor>,
 										PROJECTILE_RECORD_SIZE))
 		return 0;
 
@@ -870,12 +870,12 @@ enum { FIRM_RECORD_SIZE = 254 };
 
 static bool read_firm(File *file, Firm *firm)
 {
-	return read_with_record_size(file, firm, &visit_firm, FIRM_RECORD_SIZE);
+	return read_with_record_size(file, firm, &visit_firm<FileReaderVisitor>, FIRM_RECORD_SIZE);
 }
 
 static bool write_firm(File *file, Firm *firm)
 {
-	return write_with_record_size(file, firm, &visit_firm, FIRM_RECORD_SIZE);
+	return write_with_record_size(file, firm, &visit_firm<FileWriterVisitor>, FIRM_RECORD_SIZE);
 }
 
 //-------- Start of function FirmArray::write_file -------------//
@@ -974,10 +974,8 @@ int FirmArray::read_file(File* filePtr)
 
          //---- read data in base class -----//
 
-			#ifdef AMPLUS
-				if(!game_file_array.same_version && firmPtr->firm_id > FIRM_BASE)
-					firmPtr->firm_build_id += MAX_RACE - VERSION_1_MAX_RACE;
-			#endif
+			if(!game_file_array.same_version && firmPtr->firm_id > FIRM_BASE)
+				firmPtr->firm_build_id += MAX_RACE - VERSION_1_MAX_RACE;
 
          //--------- read worker_array ---------//
 
@@ -1160,7 +1158,6 @@ int TownArray::read_file(File* filePtr)
 	int townCount = filePtr->file_get_short();  // get no. of towns from file
 	selected_recno = filePtr->file_get_short();
 
-#ifdef AMPLUS
 	if(!game_file_array.same_version)
 	{
 		memset(race_wander_pop_array, 0, sizeof(race_wander_pop_array));
@@ -1168,9 +1165,6 @@ int TownArray::read_file(File* filePtr)
 	}
 	else
 		filePtr->file_read( race_wander_pop_array, sizeof(race_wander_pop_array) );
-#else
-	filePtr->file_read( race_wander_pop_array, sizeof(race_wander_pop_array) );
-#endif
 
 	Town::if_town_recno = filePtr->file_get_short();
 
@@ -1186,7 +1180,6 @@ int TownArray::read_file(File* filePtr)
 		{
 			townPtr = town_array.create_town();
 
-			#ifdef AMPLUS
 				if(!game_file_array.same_version)
 				{
 					Version_1_Town *oldTown = (Version_1_Town*) mem_add(sizeof(Version_1_Town));
@@ -1204,10 +1197,6 @@ int TownArray::read_file(File* filePtr)
 					if( !filePtr->file_read( townPtr, sizeof(Town) ) )
 						return 0;
 				}
-			#else
-				if( !filePtr->file_read( townPtr, sizeof(Town) ) )
-					return 0;
-			#endif
 
 			#ifdef DEBUG
 				townPtr->verify_slot_object_id_array();		// for debugging only
@@ -1288,7 +1277,7 @@ enum { NATION_ARRAY_RECORD_SIZE = 288 };
 
 static bool read_nation_array(File *file, NationArray *na)
 {
-	return read_with_record_size(file, na, &visit_nation_array,
+	return read_with_record_size(file, na, &visit_nation_array<FileReaderVisitor>,
 										  NATION_ARRAY_RECORD_SIZE);
 }
 
@@ -1298,7 +1287,7 @@ int NationArray::write_file(File* filePtr)
 {
 	//------ write info in NationArray ------//
 	
-	if (!write_with_record_size(filePtr, this, &visit_nation_array,
+	if (!write_with_record_size(filePtr, this, &visit_nation_array<FileWriterVisitor>,
 										 NATION_ARRAY_RECORD_SIZE))
 		return 0;
 
@@ -1389,12 +1378,11 @@ enum { VERSION_1_NATION_ARRAY_RECORD_SIZE = 282 };
 int NationArray::read_file(File* filePtr)
 {
    //------ read info in NationArray ------//
-#ifdef AMPLUS
 	if(!game_file_array.same_version)
 	{
 		Version_1_NationArray *oldNationArrayPtr = (Version_1_NationArray*) mem_add(sizeof(Version_1_NationArray));
 		if (!read_with_record_size(filePtr, oldNationArrayPtr,
-											&visit_version_1_nation_array,
+											&visit_version_1_nation_array<FileReaderVisitor>,
 											VERSION_1_NATION_ARRAY_RECORD_SIZE))
 		{
 			mem_del(oldNationArrayPtr);
@@ -1408,10 +1396,6 @@ int NationArray::read_file(File* filePtr)
 		if (!read_nation_array(filePtr, this))
 			return 0;
 	}
-#else
-	if (!read_nation_array(filePtr, this))
-      return 0;
-#endif
 
    //---------- read Nations --------------//
 
@@ -1713,7 +1697,7 @@ enum { VERSION_1_NATION_RECORD_SIZE = 2182 };
 
 static bool read_version_1_nation(File *file, Version_1_Nation *v1n)
 {
-	if (!read_with_record_size(file, v1n, &visit_version_1_nation,
+	if (!read_with_record_size(file, v1n, &visit_version_1_nation<FileReaderVisitor>,
 										VERSION_1_NATION_RECORD_SIZE))
 		return false;
 
@@ -1917,7 +1901,7 @@ enum { NATION_RECORD_SIZE = 2202 };
 //
 int Nation::write_file(File* filePtr)
 {
-	if (!write_with_record_size(filePtr, this, &visit_nation,
+	if (!write_with_record_size(filePtr, this, &visit_nation<FileWriterVisitor>,
 										 NATION_RECORD_SIZE))
 		return 0;
 
@@ -1960,7 +1944,7 @@ static void write_ai_info(File* filePtr, short* aiInfoArray, short aiInfoCount, 
 
 static bool read_nation(File *file, Nation *nat)
 {
-	if (!read_with_record_size(file, nat, &visit_nation, NATION_RECORD_SIZE))
+	if (!read_with_record_size(file, nat, &visit_nation<FileReaderVisitor>, NATION_RECORD_SIZE))
 		return false;
 
 	memset(&nat->action_array, 0, sizeof(nat->action_array));
@@ -1971,7 +1955,6 @@ static bool read_nation(File *file, Nation *nat)
 //
 int Nation::read_file(File* filePtr)
 {
-#ifdef AMPLUS
 	if(!game_file_array.same_version)
 	{
 		Version_1_Nation *oldNationPtr = (Version_1_Nation*) mem_add(sizeof(Version_1_Nation));
@@ -1990,10 +1973,6 @@ int Nation::read_file(File* filePtr)
 		if (!read_nation(filePtr, this))
 			return 0;
 	}
-#else
-	if (!read_nation(filePtr, this))
-		return 0;
-#endif
 
 	//-------------- read AI Action Array --------------//
 
@@ -2145,7 +2124,7 @@ enum { TORNADO_RECORD_SIZE = 44 };
 //
 int Tornado::write_file(File* filePtr)
 {
-	return write_with_record_size(filePtr, this, &visit_tornado,
+	return write_with_record_size(filePtr, this, &visit_tornado<FileWriterVisitor>,
 											TORNADO_RECORD_SIZE);
 }
 //----------- End of function Tornado::write_file ---------//
@@ -2154,7 +2133,7 @@ int Tornado::write_file(File* filePtr)
 //
 int Tornado::read_file(File* filePtr)
 {
-	if (!read_with_record_size(filePtr, this, &visit_tornado,
+	if (!read_with_record_size(filePtr, this, &visit_tornado<FileReaderVisitor>,
 										TORNADO_RECORD_SIZE))
 		return 0;
 
@@ -2274,7 +2253,7 @@ enum { REGION_ARRAY_RECORD_SIZE = 279 };
 //
 int RegionArray::write_file(File* filePtr)
 {
-	if (!write_with_record_size(filePtr, this, &visit_region_array,
+	if (!write_with_record_size(filePtr, this, &visit_region_array<FileWriterVisitor>,
 										 REGION_ARRAY_RECORD_SIZE))
 		return 0;
 
@@ -2308,7 +2287,7 @@ int RegionArray::write_file(File* filePtr)
 //
 int RegionArray::read_file(File* filePtr)
 {
-	if (!read_with_record_size(filePtr, this, &visit_region_array,
+	if (!read_with_record_size(filePtr, this, &visit_region_array<FileReaderVisitor>,
 										REGION_ARRAY_RECORD_SIZE))
 		return 0;
 

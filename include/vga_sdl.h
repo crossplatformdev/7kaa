@@ -27,7 +27,7 @@
 #include <OCOLTBL.h>
 #include <vga_base.h>
 
-#include <SDL/SDL.h>
+#include <SDL.h>
 
 #define VGA_PALETTE_SIZE 256
 
@@ -39,6 +39,7 @@ private:
 	SDL_Surface*   front;
 	SDL_Color      game_pal[VGA_PALETTE_SIZE];
 	SDL_Color*     custom_pal;
+	Uint32         video_mode_flags;
 
 public:
 	ColorTable*    vga_color_table;
@@ -59,7 +60,9 @@ public:
 
 	void   handle_messages();
 	void   flag_redraw();
+	int    is_full_screen();
 	void   toggle_full_screen();
+	void   flip();
 
 private:
 	int    init_front(VgaBuf*);
@@ -67,6 +70,7 @@ private:
 	int    init_pal(const char* fileName);
 	void   activate_pal(VgaBuf*);
 	void   refresh_palette();
+
 };
 
 typedef VgaSDL Vga;

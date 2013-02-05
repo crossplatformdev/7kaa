@@ -34,7 +34,7 @@
 #include <OREMOTE.h>
 #include <OBATTLE.h>
 #include <OGAME.h>
-#include <netplay.h>
+#include <multiplayer.h>
 #include <OERRCTRL.h>
 #include <OGFILE.h>
 #include <OCONFIG.h>
@@ -136,7 +136,6 @@ enum
 	MPMSG_SET_PROCESS_FRAME_DELAY,
 	MPMSG_COOKIE,
 	MPMSG_PLAYER_DISCONNECT,
-	MPMSG_NEW_PEER_ADDRESS
 };
 
 struct MpStructBase
@@ -364,33 +363,11 @@ struct MpStructProcessFrameDelay : public MpStructBase
 	}
 };
 
-const char *cookie_word = "ASDF";
-const int cookie_size = 4;
-struct MpStructCookie : public MpStructBase
-{
-	char cookie[cookie_size];
-	MpStructCookie() : MpStructBase(MPMSG_COOKIE)
-	{
-		memcpy(cookie, cookie_word, cookie_size);
-	}
-};
-
 struct MpStructPlayerDisconnect : public MpStructBase
 {
 	PID_TYPE lost_player_id;
 	MpStructPlayerDisconnect(PID_TYPE lost_player) : MpStructBase(MPMSG_PLAYER_DISCONNECT),
 		lost_player_id(lost_player) {}
-};
-
-struct MpStructNewPeerAddress : public MpStructBase
-{
-	PID_TYPE player_id;
-	char address[100];
-	MpStructNewPeerAddress(PID_TYPE id, int len, void *addr) : MpStructBase(MPMSG_NEW_PEER_ADDRESS),
-		player_id(id)
-	{
-		memcpy(address, addr, len);
-	}
 };
 
 //--------- Define static functions ------------//
@@ -446,7 +423,7 @@ void Game::mp_broadcast_setting()
 
 	char* dataPtr = remoteMsg->data_buf;
 
-	*(long*)dataPtr   = m.get_random_seed();
+	*(long*)dataPtr   = misc.get_random_seed();
 	dataPtr 		      += sizeof(long);
 
 	*(short*)dataPtr  = nation_array.size();
@@ -528,44 +505,32 @@ void Game::multi_player_game(int lobbied, char *game_host)
 	sub_game_mode = 0;
 	info.init_random_seed(0);			// initialize the random seed
 
-	int choice, p;
-	ProtocolType selected_protocol = TCPIP;
+	int service_mode, p;
 
-	if (!lobbied) {
+	if (!lobbied)
+	{
 		// not launched from lobby
 
-		mp_obj.poll_supported_protocols();
-		choice = mp_select_service();
-		if( !choice )
+		service_mode = mp_select_service();
+		if (!service_mode)
 		{
 			mp_obj.deinit();
 			return;
 		}
 
-		switch(choice)
-		{
-		case 1:	// IPX
-			selected_protocol = IPX;
-			break;
-		case 2:	// TCP/IP
-			selected_protocol = TCPIP;
-			break;
-		case 3:	// Modem
-			selected_protocol = Modem;
-			break;
-		case 4:	// Serial
-			selected_protocol = Serial;
-			break;
-		default:
-			selected_protocol = None;
-		}
+	}
+	else
+	{
+		service_mode = 2;
 	}
 
-	if (mp_obj.is_protocol_supported(selected_protocol))
-		mp_obj.init(selected_protocol);
+	if (mp_obj.is_protocol_supported(TCPIP))
+		mp_obj.init(TCPIP);
 
-	if (lobbied)
-		mp_obj.init_lobbied(MAX_NATION, game_host);
+	if (lobbied && !mp_obj.init_lobbied(MAX_NATION, game_host))
+	{
+		box.msg("Unable to connect from lobby.");
+	}
 
 	// do not call remote.init here, or sys.yield will call remote.poll_msg
 	if(!mp_obj.is_initialized())
@@ -576,50 +541,90 @@ void Game::multi_player_game(int lobbied, char *game_host)
 		return;
 	}
 
+	if (service_mode == 3 || service_mode == 4)
+	{
+		// internet game list provider
+		mp_obj.set_remote_session_provider("www.7kfans.com");
+	}
+
+	if (service_mode == 4)
+	{
+		if (!mp_get_leader_board())
+			box.msg("Unable to retrieve leader board");
+		mp_obj.deinit();
+		return;
+	}
+
 	// create game or join game
 	switch( mp_select_mode(NULL) )
 	{
 	case 1:		// create game
-		// BUGHERE : enter session name here
-		if (mp_obj.create_session(config.player_name, config.player_name, MAX_NATION))
 		{
-			remote.init(&mp_obj);
-			remote.create_game();
-		}
-		else
-		{
-			box.msg("Cannot create the game.");
-			mp_obj.deinit();
-			return;
-		}
-		break;
-	case 2:		// join game
-		{
-			char join_address[100];
-			strcpy(join_address, "localhost");
-			if (!lobbied && mp_get_address(join_address, 100))
-			{
-				mp_obj.init_lobbied(MAX_NATION, join_address);
-			}
-
-			if (choice = mp_select_session())
-			{
-				if (!mp_join_session(choice, config.player_name))
-				{
-					// can't join session
-					mp_obj.deinit();
-					box.msg("Unable to connect");
-					return;
-				}
-
-				remote.init(&mp_obj);
-				remote.connect_game();
-			}
-			else
+			char game_name[MP_SESSION_NAME_LEN+1];
+			char password[MP_SESSION_NAME_LEN+1];
+			strncpy(game_name, config.player_name, MP_SESSION_NAME_LEN);
+			game_name[MP_SESSION_NAME_LEN] = 0;
+			if (!input_box("Enter the of the game:", game_name, MP_SESSION_NAME_LEN+1))
 			{
 				mp_obj.deinit();
 				return;
 			}
+			password[0] = 0;
+			if (!input_box("Set the game's password:", password, MP_SESSION_NAME_LEN+1))
+				password[0] = 0;
+			if (!mp_obj.create_session(game_name, password, config.player_name, MAX_NATION))
+			{
+				box.msg("Cannot create the game.");
+				mp_obj.deinit();
+				return;
+			}
+		}
+
+		remote.init(&mp_obj);
+		remote.create_game();
+		break;
+	case 2:		// join game
+		{
+			char join_address[100];
+			int choice;
+
+			choice = lobbied;
+			if (service_mode == 1 || service_mode == 3)
+			{
+				// Join by LAN game list
+				choice = mp_select_session();
+			}
+			else if (service_mode == 2)
+			{
+				// Join by direct IP address
+				strcpy(join_address, "localhost");
+				if (!lobbied &&
+				    input_box("Enter the game's address:", join_address, 100) &&
+				    mp_obj.init_lobbied(MAX_NATION, join_address))
+				{
+					choice = 1;
+				}
+			}
+			else
+			{
+				box.msg("Service not supported");
+			}
+
+
+			if (choice && !mp_join_session(choice, config.player_name))
+			{
+				choice = 0;
+				box.msg("Unable to connect");
+			}
+
+			if (!choice)
+			{
+				mp_obj.deinit();
+				return;
+			}
+
+			remote.init(&mp_obj);
+			remote.connect_game();
 		}
 		break;
 	default:			// cancel
@@ -706,50 +711,52 @@ void Game::load_mp_game(char *fileName, int lobbied, char *game_host)
 	sub_game_mode = 1;
 
 	int nationRecno;
-	int choice, p;
-	ProtocolType selected_protocol = TCPIP;
+	int service_mode, p;
 
-	if (!lobbied) {
+	if (!lobbied)
+	{
 		// not launched from lobby
 
-		mp_obj.poll_supported_protocols();
-		choice = mp_select_service();
-		if( !choice )
+		service_mode = mp_select_service();
+		if (!service_mode)
 		{
 			mp_obj.deinit();
 			return;
 		}
 
-		switch(choice)
-		{
-		case 1:	// IPX
-			selected_protocol = IPX;
-			break;
-		case 2:	// TCP/IP
-			selected_protocol = TCPIP;
-			break;
-		case 3:	// Modem
-			selected_protocol = Modem;
-			break;
-		case 4:	// Serial
-			selected_protocol = Serial;
-			break;
-		default:
-			selected_protocol = None;
-		}
+	}
+	else
+	{
+		service_mode = 2;
 	}
 
-	if (mp_obj.is_protocol_supported(selected_protocol))
-		mp_obj.init(selected_protocol);
+	if (mp_obj.is_protocol_supported(TCPIP))
+		mp_obj.init(TCPIP);
 
-	if (lobbied)
-		mp_obj.init_lobbied(MAX_NATION, game_host);
+	if (lobbied && !mp_obj.init_lobbied(MAX_NATION, game_host))
+	{
+		box.msg("Unable to connect from lobby.");
+	}
 
 	// do not call remote.init here, or sys.yield will call remote.poll_msg
 	if(!mp_obj.is_initialized())
 	{
 		// BUGHERE : display error message
 		box.msg("Cannot initialize DirectPlay.");
+		mp_obj.deinit();
+		return;
+	}
+
+	if (service_mode == 3 || service_mode == 4)
+	{
+		// internet game list provider
+		mp_obj.set_remote_session_provider("www.7kfans.com");
+	}
+
+	if (service_mode == 4)
+	{
+		if (!mp_get_leader_board())
+			box.msg("Unable to retrieve leader board");
 		mp_obj.deinit();
 		return;
 	}
@@ -772,52 +779,77 @@ void Game::load_mp_game(char *fileName, int lobbied, char *game_host)
 	switch( mp_select_mode(fileName) )
 	{
 	case 1:		// create game
-		// BUGHERE : enter session name here
-		if (mp_obj.create_session(config.player_name, config.player_name, gamePlayerCount))
 		{
-			remote.init(&mp_obj);
-			remote.create_game();
-		}
-		else
-		{
-			box.msg("Cannot create the game.");
-			mp_obj.deinit();
-			return;
-		}
-		break;
-	case 2:		// join game
-		{
-			char join_address[100];
-			strcpy(join_address, "localhost");
-			if (!lobbied && mp_get_address(join_address, 100))
-			{
-				mp_obj.init_lobbied(MAX_NATION, join_address);
-			}
-
-			if (choice = mp_select_session())
-			{
-				if (!mp_join_session(choice, config.player_name))
-				{
-					// can't join session
-					mp_obj.deinit();
-					box.msg("Unable to connect");
-					return;
-				}
-
-				// count required player
-				gamePlayerCount = 0;
-				for (nationRecno = 1; nationRecno <= nation_array.size(); ++nationRecno)
-					if (!nation_array.is_deleted(nationRecno) && !nation_array[nationRecno]->is_ai())
-						++gamePlayerCount;
-
-				remote.init(&mp_obj);
-				remote.connect_game();
-			}
-			else
+			char game_name[MP_SESSION_NAME_LEN+1];
+			char password[MP_SESSION_NAME_LEN+1];
+			strncpy(game_name, config.player_name, MP_SESSION_NAME_LEN);
+			game_name[MP_SESSION_NAME_LEN] = 0;
+			if (!input_box("Enter the name of the game:", game_name, MP_SESSION_NAME_LEN+1))
 			{
 				mp_obj.deinit();
 				return;
 			}
+			password[0] = 0;
+			if (!input_box("Set the game's password:", password, MP_SESSION_NAME_LEN+1))
+				password[0] = 0;
+			if (!mp_obj.create_session(game_name, password, config.player_name, gamePlayerCount))
+			{
+				box.msg("Cannot create the game.");
+				mp_obj.deinit();
+				return;
+			}
+		}
+
+		remote.init(&mp_obj);
+		remote.create_game();
+		break;
+	case 2:		// join game
+		{
+			char join_address[100];
+			int choice;
+
+			choice = lobbied;
+			if (service_mode == 1 || service_mode == 3)
+			{
+				// Join by LAN game list
+				choice = mp_select_session();
+			}
+			else if (service_mode == 2)
+			{
+				// Join by direct IP address
+				strcpy(join_address, "localhost");
+				if (!lobbied &&
+				    input_box("Enter the game's address:", join_address, 100) &&
+				    mp_obj.init_lobbied(gamePlayerCount, join_address))
+				{
+					choice = 1;
+				}
+			}
+			else
+			{
+				box.msg("Service not supported");
+			}
+
+			if (choice && !mp_join_session(choice, config.player_name))
+			{
+				choice = 0;
+				box.msg("Unable to connect");
+			}
+
+			if (!choice)
+			{
+				mp_obj.deinit();
+				return;
+			}
+
+			// count required player
+			gamePlayerCount = 0;
+			for (nationRecno = 1; nationRecno <= nation_array.size(); ++nationRecno)
+				if (!nation_array.is_deleted(nationRecno) && !nation_array[nationRecno]->is_ai())
+					++gamePlayerCount;
+
+			remote.init(&mp_obj);
+			remote.connect_game();
 		}
 		break;
 	default:			// cancel
@@ -943,6 +975,16 @@ int Game::mp_select_service()
 				{
 					serviceButton[b].paint();
 				}
+
+				// TODO: Properly change these buttons
+				vga_front.d3_panel_up(buttonX[0], buttonY[0], buttonX[0] + SERVICE_BUTTON_WIDTH, buttonY[0] + SERVICE_BUTTON_HEIGHT, 0);
+				font_san.put(buttonX[0] + 10, buttonY[0] + 10, "Local Area Network", 0, VGA_WIDTH);
+				vga_front.d3_panel_up(buttonX[1], buttonY[1], buttonX[1] + SERVICE_BUTTON_WIDTH, buttonY[1] + SERVICE_BUTTON_HEIGHT, 0);
+				font_san.put(buttonX[1] + 10, buttonY[1] + 10, "Enter IP Address", 0, VGA_WIDTH);
+				vga_front.d3_panel_up(buttonX[2], buttonY[2], buttonX[2] + SERVICE_BUTTON_WIDTH, buttonY[2] + SERVICE_BUTTON_HEIGHT, 0);
+				font_san.put(buttonX[2] + 10, buttonY[2] + 10, "www.7kfans.com", 0, VGA_WIDTH);
+				vga_front.d3_panel_up(buttonX[3], buttonY[3], buttonX[3] + SERVICE_BUTTON_WIDTH, buttonY[3] + SERVICE_BUTTON_HEIGHT, 0);
+				font_san.put(buttonX[3] + 10, buttonY[3] + 10, "7kfans Leader Board", 0, VGA_WIDTH);
 			}
 
 			refreshFlag = 0;
@@ -1032,12 +1074,12 @@ int Game::mp_select_mode(char *defSaveFileName)
 	char saveFileName[8+1];		// save game name without path or extension
 	if( defSaveFileName )
 	{
-		int newLen = m.str_str(defSaveFileName, "." );
+		int newLen = misc.str_str(defSaveFileName, "." );
 		if( newLen > 1)
-			m.str_cut(saveFileName, defSaveFileName, 1, newLen-1);
+			misc.str_cut(saveFileName, defSaveFileName, 1, newLen-1);
 		else
 			err_here();
-		if( m.str_icmpx(saveFileName, "AUTO") || m.str_icmpx(saveFileName, "AUTO2") )
+		if( misc.str_icmpx(saveFileName, "AUTO") || misc.str_icmpx(saveFileName, "AUTO2") )
 		{
 			strcpy(saveFileName, "MULTI");
 		}
@@ -1137,8 +1179,8 @@ int Game::mp_select_mode(char *defSaveFileName)
 		if( rc )
 		{
 			// check saveFileName is AUTO*
-			if( m.str_icmpx(getSaveFile.input_field, "AUTO") ||
-				m.str_icmpx(getSaveFile.input_field, "AUTO2") )
+			if( misc.str_icmpx(getSaveFile.input_field, "AUTO") ||
+				misc.str_icmpx(getSaveFile.input_field, "AUTO2") )
 			{
 				if( !box.ask("It is not recommended to use this save game file name, do you wish to continue?") )
 				{
@@ -1151,9 +1193,9 @@ int Game::mp_select_mode(char *defSaveFileName)
 		{
 			// correct saveFileName
 			int newLen;
-			if( (newLen = m.str_str(getSaveFile.input_field, ".")) > 0 )
+			if( (newLen = misc.str_str(getSaveFile.input_field, ".")) > 0 )
 			{
-				m.str_cut(getSaveFile.input_field, getSaveFile.input_field, 1, newLen-1);
+				misc.str_cut(getSaveFile.input_field, getSaveFile.input_field, 1, newLen-1);
 			}
 			if( strlen(getSaveFile.input_field) == 0 )
 			{
@@ -1176,15 +1218,13 @@ int Game::mp_select_mode(char *defSaveFileName)
 //-------- End of function Game::mp_select_mode --------//
 
 
-// Display a box to ask for a host address. The pointer to name will be used
-// to initialize the field, and when the box is closed, it is filled with the
-// final address, up to name_len, including the terminating null. The return
-// is 1 when ok is pressed, and 0 when cancel is pressed.
-int Game::mp_get_address(char *name, int name_len)
+// Display a box to input a string. The pointer to name will be used
+// to initialize the field. The user may edit the box as appropriate.
+// The return is 1 when ok is pressed, and 0 when cancel is pressed.
+int Game::input_box(const char *tell_string, char *buf, int len)
 {
 	const char *buttonDes1 = "Ok";
 	const char *buttonDes2 = "Cancel";
-	const char *tell_string = "Enter the game's address:";
 	const int box_button_margin = 32; // BOX_BUTTON_MARGIN
 	const int box_x1 = 250;
 	const int box_y1 = 200;
@@ -1222,8 +1262,8 @@ int Game::mp_get_address(char *name, int name_len)
 	input_box.init(box_x1 + box_side_margin,
 		       box_y1 + box_top_margin + font_san.text_height() + 2,
 		       box_x2 - box_side_margin,
-		       name,
-		       name_len,
+		       buf,
+		       len,
 		       &font_san,
 		       0,
 		       0);
@@ -1256,8 +1296,8 @@ int Game::mp_get_address(char *name, int name_len)
 
 		if (config.music_flag && !music.is_playing())
 			music.play(1, sys.cdrom_drive ? MUSIC_CD_THEN_WAV : 0);
-                else
-                        music.stop();
+		else if (!config.music_flag && music.is_playing())
+			music.stop();
 
 		vga_front.unlock_buf();
 	}
@@ -1275,15 +1315,12 @@ int Game::mp_select_session()
 #define SSOPTION_PAGE           0x00000010
 #define SSOPTION_POLL_SESSION   0x00000001
 #define SSOPTION_DISP_SESSION   0x00000002
-#ifdef AMPLUS
 #define SSOPTION_SCROLL_BAR     0x00000004
-#endif
 #define SSOPTION_ALL            0x7fffffff
 
 	enum { JOIN_BUTTON_X = 320, JOIN_BUTTON_Y = 538 };
 	enum { CANCEL_BUTTON_X = 520, CANCEL_BUTTON_Y = 538 };
 
-#ifdef AMPLUS
 	enum { SESSION_BUTTON_X1 = 30, SESSION_BUTTON_Y1 = 160 };
 	enum { SESSION_BUTTON_Y_SPACING = 44, MAX_BUTTON = 8 };
 	enum { SESSION_BUTTON_X2 = 754,
@@ -1292,14 +1329,6 @@ int Game::mp_select_session()
 		SESSION_BUTTON_Y2 = SESSION_BUTTON_Y1 + MAX_BUTTON * SESSION_BUTTON_Y_SPACING-1};
 
 	enum { SCROLL_X1=757, SCROLL_Y1 = 176, SCROLL_X2 = 770, SCROLL_Y2 = 493 };
-#else
-	enum { SESSION_BUTTON_X1 = 108, SESSION_BUTTON_Y1 = 125 };
-	enum { SESSION_BUTTON_Y_SPACING = BASIC_OPTION_HEIGHT, MAX_BUTTON = 6 };
-	enum { SESSION_BUTTON_X2 = SESSION_BUTTON_X1 + BASIC_OPTION_X_SPACE-1,
-		SESSION_DESC_Y1 = SESSION_BUTTON_Y1+10,
-		SESSION_DESC_X1 = SESSION_BUTTON_X2 + 8, SESSION_DESC_X2 = 600,
-		SESSION_BUTTON_Y2 = SESSION_BUTTON_Y1 + MAX_BUTTON * SESSION_BUTTON_Y_SPACING-1};
-#endif
 
 	// ####### begin Gilbert 13/2 ########//
 	if( mp_obj.is_lobbied() == 2 )		// join session, but selected in lobby
@@ -1323,7 +1352,6 @@ int Game::mp_select_session()
 	Button3D cancelButton;
 	cancelButton.create(CANCEL_BUTTON_X, CANCEL_BUTTON_Y, "CANCEL-U", "CANCEL-D", 1, 0);
 
-#ifdef AMPLUS
 	SlideVBar scrollBar;
 
 	scrollBar.init_scroll(SCROLL_X1, SCROLL_Y1, SCROLL_X2, SCROLL_Y2,
@@ -1339,9 +1367,6 @@ int Game::mp_select_session()
 	Blob browseArea[MAX_BUTTON];
 
 	#define BASE_SESSION scrollBar.view_recno
-#else
-	#define BASE_SESSION 1
-#endif
 
 	unsigned long pollTime = 1000;
 	vga_front.unlock_buf();
@@ -1368,14 +1393,11 @@ int Game::mp_select_session()
 			{
 				// --------- display interface screen -------//
 				image_menu.put_to_buf( &vga_back, "MPG-PG2" );
-#ifdef AMPLUS
 				image_menu2.put_to_buf( &vga_back, "MPG-PG2" );
-#endif
 				image_menu.put_back( 234, 15,
 					sub_game_mode == 0 ? (char*)"TOP-NMPG" : (char*)"TOP-LMPG" );
 				vga_util.blt_buf(0, 0, vga_back.buf_width()-1, vga_back.buf_height()-1, 0);
 
-#ifdef AMPLUS
 				scrollBar.paint();
 				scrollUp.paint();
 				scrollDown.paint();
@@ -1389,32 +1411,30 @@ int Game::mp_select_session()
 						SESSION_BUTTON_X2, (b+1)*SESSION_BUTTON_Y_SPACING+SESSION_BUTTON_Y1-1,
 						browseArea[b].ptr);
 				}
-#endif
 				joinButton.paint();
 				cancelButton.paint();
 			}
 
 			if( refreshFlag & SSOPTION_POLL_SESSION )
 			{
-				pollTime = m.get_time();
+				pollTime = misc.get_time();
 				if( !mp_obj.poll_sessions() )
 				{
 					// return fail if poll_sessions fails or cancel the dialogue box
+					box.msg("Unable to poll sessions.\n");
 					choice = 0;
 					break;
 				}
 
-				// limit the pollTime between 1 sec to 10 sec
-				pollTime = m.get_time() - pollTime + 1000;
+				// limit the pollTime between 5 sec to 10 sec
+				pollTime = misc.get_time() - pollTime + 5000;
 				if( pollTime > 10000 )
 					pollTime = 10000;
 
-				refreshTime = m.get_time();
+				refreshTime = misc.get_time();
 
-#ifdef AMPLUS
 				// ------- sort by name ---------//
 				mp_obj.sort_sessions(2);		// sort by session name
-#endif
 
 				// ------- update choice ---------- //
 				choice = 0;
@@ -1430,29 +1450,22 @@ int Game::mp_select_session()
 
 				//------- update scroll bar --------//
 				// BUGHERE : error if empty
-#ifdef AMPLUS
 				scrollBar.set(1, s-1, scrollBar.view_recno);
 				refreshFlag |= SSOPTION_SCROLL_BAR;
-#endif
 				refreshFlag |= SSOPTION_DISP_SESSION;
 			}
 
 			if( refreshFlag & SSOPTION_DISP_SESSION )
 			{
-#ifndef AMPLUS
-				vga_util.blt_buf(SESSION_BUTTON_X1, SESSION_BUTTON_Y1, SESSION_DESC_X2, SESSION_BUTTON_Y2, 0);
-#endif
 				for( b = 0, s = BASE_SESSION; b < MAX_BUTTON; ++b, ++s )
 				{
 
-#ifdef AMPLUS
 					vga_back.put_bitmap(
 						SESSION_BUTTON_X1, b*SESSION_BUTTON_Y_SPACING+SESSION_BUTTON_Y1,
 						browseArea[(s-1)%MAX_BUTTON].ptr);
 					vga_util.blt_buf(
 						SESSION_BUTTON_X1, b*SESSION_BUTTON_Y_SPACING+SESSION_BUTTON_Y1,
 						SESSION_BUTTON_X2, (b+1)*SESSION_BUTTON_Y_SPACING+SESSION_BUTTON_Y1-1, 0);
-#endif
 
 					if( mp_obj.get_session(s) )
 					{
@@ -1465,20 +1478,23 @@ int Game::mp_select_session()
 						{
 							vga_front.adjust_brightness( SESSION_BUTTON_X1, SESSION_BUTTON_Y1 + b*SESSION_BUTTON_Y_SPACING,
 								SESSION_BUTTON_X2, SESSION_BUTTON_Y1 + (b+1)*SESSION_BUTTON_Y_SPACING-1, -2);
-#ifndef AMPLUS
-							image_interface.put_front(SESSION_BUTTON_X1, SESSION_BUTTON_Y1 + b*SESSION_BUTTON_Y_SPACING, "BAS_DOWN" );
-#endif
 						}
 					}
 				}
+
+				if (mp_obj.is_update_available() > 0)
+				{
+					String update_message;
+					update_message = "There is a new version of Seven Kingdoms: Ancient Adversaries at www.7kfans.com";
+					vga_front.d3_panel_up(60, 65, VGA_WIDTH-60, 100, 2);
+					font_san.put(70, 75, update_message, 0, VGA_WIDTH-70);
+				}
 			}
 
-#ifdef AMPLUS
 			if( refreshFlag & SSOPTION_SCROLL_BAR )
 			{
 				scrollBar.paint();
 			}
-#endif
 
 			refreshFlag = 0;
 		}
@@ -1493,7 +1509,6 @@ int Game::mp_select_session()
 		else
 			music.stop();
 
-#ifdef AMPLUS
 		int scrollRc = scrollBar.detect();
 		if( scrollRc )
 		{
@@ -1502,13 +1517,12 @@ int Game::mp_select_session()
 			refreshFlag &= ~SSOPTION_POLL_SESSION;
 
 			// suspend the refreshTime, so session list won't update immediate after release dragging
-			refreshTime = m.get_time();
+			refreshTime = misc.get_time();
 
 			if( scrollRc == 1)
 				refreshFlag |= SSOPTION_DISP_SESSION;
 		}
 		else
-#endif
 		{
 			for( b = 0, s = BASE_SESSION; b < MAX_BUTTON && mp_obj.get_session(s) ; ++b, ++s )
 			{
@@ -1521,11 +1535,10 @@ int Game::mp_select_session()
 					joinButton.enable();
 
 					// suspend the refreshTime, so session list won't update immediate after release dragging
-					refreshTime = m.get_time();
+					refreshTime = misc.get_time();
 				}
 			}
 
-#ifdef AMPLUS
 			if( scrollUp.detect() )
 			{
 				int oldValue = scrollBar.view_recno;
@@ -1539,7 +1552,6 @@ int Game::mp_select_session()
 				if( oldValue != scrollBar.set_view_recno(oldValue+1) )
 					refreshFlag |= SSOPTION_DISP_SESSION | SSOPTION_SCROLL_BAR;
 			}
-#endif
 
 			if( choice > 0 && joinButton.detect() )
 				break;
@@ -1550,7 +1562,7 @@ int Game::mp_select_session()
 				break;
 			}
 
-			if( !(mouse.skey_state & SHIFT_KEY_MASK) && m.get_time() - refreshTime > pollTime )
+			if( !(mouse.skey_state & SHIFT_KEY_MASK) && misc.get_time() - refreshTime > pollTime )
 				refreshFlag |= SSOPTION_POLL_SESSION | SSOPTION_DISP_SESSION;
 		}
 
@@ -1574,10 +1586,15 @@ int Game::mp_join_session(int session_id, char *player_name)
 	int width;
 	int tried_connection = 0;
 	int connected = 0;
-	int got_cookie = 0;
 	int finished = 0;
 	const int box_button_margin = 32; // BOX_BUTTON_MARGIN
+	char password[MP_SESSION_NAME_LEN+1];
  
+	memset(password, 0, sizeof(password));
+	if (mp_obj.get_session(session_id)->password[0] &&
+			!input_box("Enter the game's password:", password, MP_SESSION_NAME_LEN+1))
+		return 0;
+
 	box.tell("Attempting to connect");
 
 	width = box.box_x2 - box.box_x1 + 1;
@@ -1593,42 +1610,74 @@ int Game::mp_join_session(int session_id, char *player_name)
 			tried_connection = 1;
 
 			// NOTE: If this function causes too much delay, put it in a thread
-			connected = mp_obj.join_session(session_id, player_name);
+			connected = mp_obj.join_session(session_id, password, player_name);
 			if (!connected)
 				break;
-
-			MpStructCookie cookie;
-			mp_obj.send_stream(1, &cookie, sizeof(cookie));
-		} else if (connected) {
-			if (!got_cookie) {
-				PID_TYPE from, to;
-				uint32_t recvLen;
-				int sysMsgCount;
-				char *recvPtr = mp_obj.receive_stream(&from, &to, &recvLen, &sysMsgCount);
-				if (sysMsgCount)
-					break;
-				if (recvPtr) {
-					MpStructCookie *ack = (MpStructCookie *)recvPtr;
-
-					if (ack->msg_id == MPMSG_COOKIE) {
-						if (memcmp(ack->cookie, cookie_word, cookie_size))
-							break;
-						// the ack contains my player's id, and the host's name
-						mp_obj.add_player(config.player_name, to); // add myself
-						mp_obj.set_my_player_id(to); // register my id
-						got_cookie = 1;
-					}
-				}
-			} else {
-				mp_obj.send_discovery();
-				if (mp_obj.receive_discovery_ack()) {
-					finished = 1;
-					break;
-				}
-			}
+		} else if (connected && mp_obj.is_pregame()) {
+			finished = 1;
+			break;
 		}
 
 		vga_front.lock_buf();
+
+		mp_obj.yield();
+		sys.yield();
+		mouse.get_event();
+
+		if (buttonCancel.detect(buttonCancel.str_buf[0], KEY_ESC) ||
+		    mouse.any_click(1))     // detect right button only when the button is "Cancel"
+		{
+			mouse.get_event();
+			break;
+		}
+
+		sys.blt_virtual_buf();		// blt the virtual front buffer to the screen
+
+
+		if (config.music_flag && !music.is_playing())
+			music.play(1, sys.cdrom_drive ? MUSIC_CD_THEN_WAV : 0);
+		else if (!config.music_flag && music.is_playing())
+			music.stop();
+
+		vga_front.unlock_buf();
+	}
+	if (!vga_front.buf_locked)
+		vga_front.lock_buf();
+
+	box.close();
+
+	return finished;
+}
+
+int Game::mp_get_leader_board()
+{
+	Button buttonCancel;
+	int width;
+	const int box_button_margin = 32; // BOX_BUTTON_MARGIN
+	int ret;
+
+	box.tell("Retrieving leaderboard");
+
+	width = box.box_x2 - box.box_x1 + 1;
+	buttonCancel.create_text(box.box_x1 + width / 2 + 2,
+				 box.box_y2 - box_button_margin,
+				 (char*)"Cancel");
+
+	buttonCancel.paint();
+
+	vga_front.unlock_buf();
+
+	while (1)
+	{
+		vga_front.lock_buf();
+
+		ret = mp_obj.show_leader_board();
+		if (ret)
+		{
+			ret = ret == 1;
+			break;
+		}
+			
 
 		sys.yield();
 		mouse.get_event();
@@ -1642,11 +1691,9 @@ int Game::mp_join_session(int session_id, char *player_name)
 
 		sys.blt_virtual_buf();		// blt the virtual front buffer to the screen
 
-		if (config.music_flag) {
-			if (!music.is_playing())
-				music.play(1, sys.cdrom_drive ? MUSIC_CD_THEN_WAV : 0);
-		}
-		else
+		if (config.music_flag && !music.is_playing())
+			music.play(1, sys.cdrom_drive ? MUSIC_CD_THEN_WAV : 0);
+		else if (!config.music_flag && music.is_playing())
 			music.stop();
 
 		vga_front.unlock_buf();
@@ -1656,9 +1703,8 @@ int Game::mp_join_session(int session_id, char *player_name)
 
 	box.close();
 
-	return finished;
+	return ret;
 }
-
 
 // define bit flag for refreshFlag
 #define SGOPTION_PAGE           0x40000000
@@ -1873,7 +1919,6 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 
 	// --------- initialize terrain_set button group -------//
 
-	// ##### begin Gilbert 25/10 #######//
 	ButtonCustomGroup terrainGroup(3);
 	for( i = 0; i < 3; ++i )
 	{
@@ -1882,26 +1927,11 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 		#else
 			#define Y_SHIFT 0
 		#endif
-#ifdef AMPLUS
 		terrainGroup[i].create(166+i*BASIC_OPTION_X_SPACE, offsetY+248+Y_SHIFT, 
 			166+(i+1)*BASIC_OPTION_X_SPACE-1, offsetY+248+Y_SHIFT+BASIC_OPTION_HEIGHT-1,
 			disp_virtual_button, ButtonCustomPara(&terrainGroup, i+1), 0, 0);
-#else
-		int k = i;
-		switch(i)
-		{
-		case 1: k = 2; break;
-		case 2: k = 1; break;
-		}
-		terrainGroup[i].create(205+k*BASIC_OPTION_X_SPACE, offsetY+248+Y_SHIFT, 
-			205+(k+1)*BASIC_OPTION_X_SPACE-1, offsetY+248+Y_SHIFT+BASIC_OPTION_HEIGHT-1,
-			disp_virtual_button, ButtonCustomPara(&terrainGroup, i+1), 0, 0);
-		if( i == 1 )
-			terrainGroup[i].enable_flag = 0;
-#endif
 		#undef Y_SHIFT
 	}
-	// ##### end Gilbert 25/10 #######//
 
 	// --------- initialize land_mass button group -------//
 
@@ -2155,6 +2185,7 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 		vga_front.lock_buf();
 		// ####### end Gilbert 23/10 #######//
 
+		mp_obj.yield();
 		sys.yield();
 		mouse.get_event();
 
@@ -2190,7 +2221,7 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 						#define Y_SHIFT 0
 					#endif
 					font_san.center_put(564, offsetY+144+Y_SHIFT, 564+25, offsetY+144+Y_SHIFT+21,
-						m.format(tempConfig.ai_nation_count), 1);
+						misc.format(tempConfig.ai_nation_count), 1);
 					aiNationInc.paint();
 					aiNationDec.paint();
 					#undef Y_SHIFT
@@ -2244,7 +2275,7 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 				if( refreshFlag & SGOPTION_RAW )
 				{
 					font_san.center_put(327, offsetY+77, 327+25, offsetY+77+21,
-						m.format(tempConfig.start_up_raw_site), 1);
+						misc.format(tempConfig.start_up_raw_site), 1);
 					rawSiteInc.paint();
 					rawSiteDec.paint();
 				}
@@ -2284,7 +2315,7 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 				{
 					enoughPeopleButton.paint(tempConfig.goal_population_flag);
 					font_san.center_put( 446, offsetY+176, 446+67, offsetY+176+21,
-						m.format(tempConfig.goal_population), 1);
+						misc.format(tempConfig.goal_population), 1);
 					peopleInc.paint();
 					peopleDec.paint();
 				}
@@ -2292,7 +2323,7 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 				{
 					enoughIncomeButton.paint(tempConfig.goal_economic_score_flag);
 					font_san.center_put( 446, offsetY+207, 446+67, offsetY+207+21,
-						m.format(tempConfig.goal_economic_score), 1);
+						misc.format(tempConfig.goal_economic_score), 1);
 					incomeInc.paint();
 					incomeDec.paint();
 				}
@@ -2300,7 +2331,7 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 				{
 					enoughScoreButton.paint(tempConfig.goal_total_score_flag);
 					font_san.center_put( 446, offsetY+239, 446+67, offsetY+239+21,
-						m.format(tempConfig.goal_total_score), 1);
+						misc.format(tempConfig.goal_total_score), 1);
 					scoreInc.paint();
 					scoreDec.paint();
 				}
@@ -2308,7 +2339,7 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 				{
 					timeLimitButton.paint(tempConfig.goal_year_limit_flag);
 					font_san.center_put( 446, offsetY+271, 446+33, offsetY+271+21,
-						m.format(tempConfig.goal_year_limit), 1);
+						misc.format(tempConfig.goal_year_limit), 1);
 					yearInc.paint();
 					yearDec.paint();
 				}
@@ -2353,7 +2384,7 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 			if( (refreshFlag & SGOPTION_DIFFICULTY) || (mRefreshFlag & MGOPTION_PLAYERS) )
 			{
 				font_san.center_put( 718, offsetY+74, 780, offsetY+108, 
-					m.format(tempConfig.multi_player_difficulty(regPlayerCount-1)), 1 );
+					misc.format(tempConfig.multi_player_difficulty(regPlayerCount-1)), 1 );
 			}
 
 			// -------- repaint button -------//
@@ -2440,18 +2471,6 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 				case MPMSG_ABORT_GAME:
 					box.msg("The game host has aborted the game.");
 					return 0;
-				case MPMSG_COOKIE:
-					if (remote.is_host)
-					{
-						MpStructCookie *cookie = (MpStructCookie *)recvPtr;
-						if (memcmp(cookie->cookie, cookie_word, cookie_size)) {
-							mp_obj.delete_player(from);
-						} else {
-							MpStructCookie ack;
-							mp_obj.send_stream(from, &ack, sizeof(MpStructCookie));
-						}
-					}
-					break;
 				case MPMSG_SEND_CONFIG:
 					tempConfig.change_game_setting( ((MpStructConfig *)recvPtr)->game_config );
 					refreshFlag |= SGOPTION_ALL_OPTIONS;
@@ -2490,17 +2509,21 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 									MpStructAcceptNewPlayer msgNewb(desc->pid(), desc->friendly_name_str());
 									mp_obj.send_stream(from, &msgNewb, sizeof(msgNewb));
 									if (i != 1) {
-										void *addr;
+										struct inet_address addr;
 										int len;
 										len = desc->get_address(&addr);
-										MpStructNewPeerAddress msgPeer(i, len, addr);
+										MsgNewPeerAddress msgPeer;
+										msgPeer.msg_id = MPMSG_NEW_PEER_ADDRESS;
+										msgPeer.player_id = i;
+										msgPeer.host = addr.host;
+										msgPeer.port = addr.port;
 										mp_obj.send_stream(from, &msgPeer, sizeof(msgPeer));
 									}
 								}
 							}
 
 							// assign initial race
-							int c = m.get_time() % MAX_RACE;
+							int c = misc.get_time() % MAX_RACE;
 							int t;
 							for( t = 0; t < MAX_RACE; ++t, ++c )
 							{
@@ -2517,7 +2540,7 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 							err_when( t >= MAX_RACE );		// not found
 
 							// assign initial color
-							c = m.get_time() % MAX_COLOR_SCHEME;
+							c = misc.get_time() % MAX_COLOR_SCHEME;
 							for( t = 0; t < MAX_COLOR_SCHEME; ++t, ++c )
 							{
 								c %= MAX_COLOR_SCHEME;
@@ -2534,7 +2557,7 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 
 							// send random seed
 							// ###### begin Gilbert 25/10 #######//
-							// MpStructSeed msgRandomSeed(m.get_random_seed());
+							// MpStructSeed msgRandomSeed(misc.get_random_seed());
 							// mp_obj.send_stream( from, &msgRandomSeed, sizeof(msgRandomSeed) );
 							mp_obj.send_stream( from, &msgSeedStr, sizeof(msgSeedStr) );
 							// ###### end Gilbert 25/10 #######//
@@ -2777,24 +2800,16 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 					break;
 				case MPMSG_NEW_PEER_ADDRESS:
 					if (!remote.is_host) {
-						MpStructNewPeerAddress *msg = (MpStructNewPeerAddress *)recvPtr;
-						mp_obj.set_peer_address(msg->player_id, &msg->address);
+						struct inet_address address;
+						MsgNewPeerAddress *msg = (MsgNewPeerAddress *)recvPtr;
+						address.host = msg->host;
+						address.port = msg->port;
+						mp_obj.set_peer_address(msg->player_id, &address);
 					}
 					break;
 				default:		// if the game is started, any other thing is received
 					return 0;
 				}
-			}
-		}
-
-		// handle peer discovery
-		if (remote.is_host) {
-			void *address;
-			uint32_t who;
-			int len = mp_obj.receive_discovery(&who, &address);
-			if (len) {
-				MpStructNewPeerAddress msgPeer(who, len, address);
-				mp_obj.send_stream(BROADCAST_PID, &msgPeer, sizeof(msgPeer));
 			}
 		}
 
@@ -3337,8 +3352,7 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 	{
 		retFlag = 0;
 
-		if( remote.is_host )
-			mp_obj.disable_join_session();
+		mp_obj.game_starting();
 
 		// mp_obj.poll_players();
 		nation_array.init();
@@ -3363,9 +3377,9 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 			do
 			{
 				info.init_random_seed( atol(msgSeedStr.seed_str) );
-			} while (m.get_random_seed() == 0L);
+			} while (misc.get_random_seed() == 0L);
 			{
-				MpStructSeed msgSeed(m.get_random_seed());
+				MpStructSeed msgSeed(misc.get_random_seed());
 				memcpy( setupString.reserve(sizeof(msgSeed)), &msgSeed, sizeof(msgSeed) );
 			}
 
@@ -3376,10 +3390,6 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 			}
 
 			// BUGHERE : terrain_set 2 is not available
-#ifndef AMPLUS
-			if( tempConfig.terrain_set == 2)
-				tempConfig.terrain_set = 1;
-#endif
 
 			config = tempConfig;		// nation_array.new_nation reads setting from config
 
@@ -3409,13 +3419,11 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 
 			// ---- force set to the lowest frame delay -------//
 
-#ifdef AMPLUS
 			remote.set_process_frame_delay(FORCE_MAX_FRAME_DELAY);
 			{
 				MpStructProcessFrameDelay msgFrameDelay(remote.get_process_frame_delay());
 				memcpy( setupString.reserve(sizeof(msgFrameDelay)), &msgFrameDelay, sizeof(msgFrameDelay));
 			}
-#endif
 
 			// -------- send sync test level ----------//
 
@@ -3466,10 +3474,6 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 					tempConfig.change_game_setting( ((MpStructConfig *) recvPtr)->game_config );
 					offset += sizeof( MpStructConfig );
 					++recvConfig;
-#ifndef AMPLUS
-					if( tempConfig.terrain_set == 2)
-						tempConfig.terrain_set = 1;
-#endif
 					config = tempConfig;		// nation_array.new_nation reads setting from config
 					break;
 
@@ -3560,9 +3564,9 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 			// ---- to filter other all message until MP_MSG_END_SETTING ---//
 
 			trial = 5000;
-			startTime = m.get_time();
+			startTime = misc.get_time();
 			int recvEndSetting = 0;
-			while( --trial > 0 || m.get_time() - startTime < 10000 )
+			while( --trial > 0 || misc.get_time() - startTime < 10000 )
 			{
 				if( recvEndSetting >= playerCount-1)
 					break;
@@ -3570,7 +3574,7 @@ int Game::mp_select_option(NewNationPara *nationPara, int *mpPlayerCount)
 				if( recvPtr )
 				{
 					trial = MAX(trial, 1000);
-					startTime = m.get_time();
+					startTime = misc.get_time();
 					if( ((MpStructBase *)recvPtr)->msg_id == MPMSG_END_SETTING )
 					{
 						recvEndSetting++;
@@ -3696,7 +3700,7 @@ int Game::mp_select_load_option(char *fileName)
 	{
 		memset( colorAssigned, 0, sizeof(colorAssigned) );		// assume all color are unassigned
 		MpStructLoadGameNewPlayer msgNewPlayer( mp_obj.get_my_player_id(), ~nation_array, sys.frame_count,
-			m.get_random_seed(),
+			misc.get_random_seed(),
 			PLAYER_RATIO_CDROM,
 			config.player_name );
 		mp_obj.send_stream(BROADCAST_PID, &msgNewPlayer, sizeof(msgNewPlayer) );
@@ -3772,7 +3776,6 @@ int Game::mp_select_load_option(char *fileName)
 
 	// --------- initialize terrain_set button group -------//
 
-	// ####### begin Gilbert 25/10 #######//
 	ButtonCustomGroup terrainGroup(3);
 	for( i = 0; i < 3; ++i )
 	{
@@ -3781,26 +3784,11 @@ int Game::mp_select_load_option(char *fileName)
 		#else
 			#define Y_SHIFT 0
 		#endif
-#ifdef AMPLUS
 		terrainGroup[i].create(166+i*BASIC_OPTION_X_SPACE, offsetY+248+Y_SHIFT, 
 			166+(i+1)*BASIC_OPTION_X_SPACE-1, offsetY+248+Y_SHIFT+BASIC_OPTION_HEIGHT-1,
 			disp_virtual_button, ButtonCustomPara(&terrainGroup, i+1), 0, 0);
-#else
-		int k = i;
-		switch(i)
-		{
-		case 1: k = 2; break;
-		case 2: k = 1; break;
-		}
-		terrainGroup[i].create(205+k*BASIC_OPTION_X_SPACE, offsetY+248+Y_SHIFT, 
-			205+(k+1)*BASIC_OPTION_X_SPACE-1, offsetY+248+Y_SHIFT+BASIC_OPTION_HEIGHT-1,
-			disp_virtual_button, ButtonCustomPara(&terrainGroup, i+1), 0, 0);
-		if( i == 1 )
-			terrainGroup[i].enable_flag = 0;
-#endif
 		#undef Y_SHIFT
 	}
-	// ####### end Gilbert 25/10 #######//
 
 	// --------- initialize land_mass button group -------//
 
@@ -4053,6 +4041,7 @@ int Game::mp_select_load_option(char *fileName)
 		vga_front.lock_buf();
 		// ####### begin Gilbert 24/10 ########//
 
+		mp_obj.yield();
 		sys.yield();
 		mouse.get_event();
 
@@ -4086,7 +4075,7 @@ int Game::mp_select_load_option(char *fileName)
 						#define Y_SHIFT 0
 					#endif
 					font_san.center_put(564, offsetY+144+Y_SHIFT, 564+25, offsetY+144+Y_SHIFT+21,
-						m.format(tempConfig.ai_nation_count), 1);
+						misc.format(tempConfig.ai_nation_count), 1);
 					aiNationInc.paint();
 					aiNationDec.paint();
 					#undef Y_SHIFT
@@ -4140,7 +4129,7 @@ int Game::mp_select_load_option(char *fileName)
 				if( refreshFlag & SGOPTION_RAW )
 				{
 					font_san.center_put(327, offsetY+77, 327+25, offsetY+77+21,
-						m.format(tempConfig.start_up_raw_site), 1);
+						misc.format(tempConfig.start_up_raw_site), 1);
 					rawSiteInc.paint();
 					rawSiteDec.paint();
 				}
@@ -4180,7 +4169,7 @@ int Game::mp_select_load_option(char *fileName)
 				{
 					enoughPeopleButton.paint(tempConfig.goal_population_flag);
 					font_san.center_put( 446, offsetY+176, 446+67, offsetY+176+21,
-						m.format(tempConfig.goal_population), 1);
+						misc.format(tempConfig.goal_population), 1);
 					peopleInc.paint();
 					peopleDec.paint();
 				}
@@ -4188,7 +4177,7 @@ int Game::mp_select_load_option(char *fileName)
 				{
 					enoughIncomeButton.paint(tempConfig.goal_economic_score_flag);
 					font_san.center_put( 446, offsetY+207, 446+67, offsetY+207+21,
-						m.format(tempConfig.goal_economic_score), 1);
+						misc.format(tempConfig.goal_economic_score), 1);
 					incomeInc.paint();
 					incomeDec.paint();
 				}
@@ -4196,7 +4185,7 @@ int Game::mp_select_load_option(char *fileName)
 				{
 					enoughScoreButton.paint(tempConfig.goal_total_score_flag);
 					font_san.center_put( 446, offsetY+239, 446+67, offsetY+239+21,
-						m.format(tempConfig.goal_total_score), 1);
+						misc.format(tempConfig.goal_total_score), 1);
 					scoreInc.paint();
 					scoreDec.paint();
 				}
@@ -4204,7 +4193,7 @@ int Game::mp_select_load_option(char *fileName)
 				{
 					timeLimitButton.paint(tempConfig.goal_year_limit_flag);
 					font_san.center_put( 446, offsetY+271, 446+33, offsetY+271+21,
-						m.format(tempConfig.goal_year_limit), 1);
+						misc.format(tempConfig.goal_year_limit), 1);
 					yearInc.paint();
 					yearDec.paint();
 				}
@@ -4249,7 +4238,7 @@ int Game::mp_select_load_option(char *fileName)
 			if( (refreshFlag & SGOPTION_DIFFICULTY) || (mRefreshFlag & MGOPTION_PLAYERS) )
 			{
 				font_san.center_put( 718, offsetY+84, 774, offsetY+108, 
-					m.format(tempConfig.difficulty_rating), 1 );
+					misc.format(tempConfig.difficulty_rating), 1 );
 			}
 
 			// -------- repaint button -------//
@@ -4368,7 +4357,7 @@ int Game::mp_select_load_option(char *fileName)
 							&& nation_array[newPlayerMsg->nation_recno]->race_id == newPlayerMsg->race_id
 							&& !colorAssigned[newPlayerMsg->color_scheme_id-1] 
 							&& newPlayerMsg->frame_count == sys.frame_count
-							&& newPlayerMsg->random_seed == m.get_random_seed() )
+							&& newPlayerMsg->random_seed == misc.get_random_seed() )
 						{
 							mp_obj.set_player_name(from, newPlayerMsg->player_name);
 
@@ -4390,10 +4379,14 @@ int Game::mp_select_load_option(char *fileName)
 									MpStructAcceptNewPlayer msgNewb(desc->pid(), desc->friendly_name_str());
 									mp_obj.send_stream(from, &msgNewb, sizeof(msgNewb));
 									if (i != 1) {
-										void *addr;
+										struct inet_address addr;
 										int len;
 										len = desc->get_address(&addr);
-										MpStructNewPeerAddress msgPeer(i, len, addr);
+										MsgNewPeerAddress msgPeer;
+										msgPeer.msg_id = MPMSG_NEW_PEER_ADDRESS;
+										msgPeer.player_id = i;
+										msgPeer.host = addr.host;
+										msgPeer.port = addr.port;
 										mp_obj.send_stream(from, &msgPeer, sizeof(msgPeer));
 									}
 								}
@@ -4530,24 +4523,16 @@ int Game::mp_select_load_option(char *fileName)
 					break;
 				case MPMSG_NEW_PEER_ADDRESS:
 					if (!remote.is_host) {
-						MpStructNewPeerAddress *msg = (MpStructNewPeerAddress *)recvPtr;
-						mp_obj.set_peer_address(msg->player_id, &msg->address);
+						struct inet_address address;
+						MsgNewPeerAddress *msg = (MsgNewPeerAddress *)recvPtr;
+						address.host = msg->host;
+						address.port = msg->port;
+						mp_obj.set_peer_address(msg->player_id, &address);
 					}
 					break;
 				default:		// if the game is started, any other thing is received
 					return 0;
 				}
-			}
-		}
-
-		// handle peer discovery
-		if (remote.is_host) {
-			void *address;
-			uint32_t who;
-			int len = mp_obj.receive_discovery(&who, &address);
-			if (len) {
-				MpStructNewPeerAddress msgPeer(who, len, address);
-				mp_obj.send_stream(BROADCAST_PID, &msgPeer, sizeof(msgPeer));
 			}
 		}
 
@@ -4723,8 +4708,7 @@ int Game::mp_select_load_option(char *fileName)
 	{
 		retFlag = 0;
 
-		if( remote.is_host )
-			mp_obj.disable_join_session();
+		mp_obj.game_starting();
 
 		// mp_obj.poll_players();
 			
@@ -4854,13 +4838,11 @@ int Game::mp_select_load_option(char *fileName)
 
 			// ---- force set to the lowest frame delay -------//
 
-#ifdef AMPLUS
 			remote.set_process_frame_delay(FORCE_MAX_FRAME_DELAY);
 			{
 				MpStructProcessFrameDelay msgFrameDelay(remote.get_process_frame_delay());
 				memcpy( setupString.reserve(sizeof(msgFrameDelay)), &msgFrameDelay, sizeof(msgFrameDelay));
 			}
-#endif
 
 			// -------- send sync test level ----------//
 
@@ -4985,9 +4967,9 @@ int Game::mp_select_load_option(char *fileName)
 			// ---- to filter other all message until MP_MSG_END_SETTING ---//
 
 			trial = 5000;
-			startTime = m.get_time();
+			startTime = misc.get_time();
 			int recvEndSetting = 0;
-			while( --trial > 0 || m.get_time() - startTime < 10000 )
+			while( --trial > 0 || misc.get_time() - startTime < 10000 )
 			{
 				if( recvEndSetting >= playerCount-1)
 					break;
@@ -4995,7 +4977,7 @@ int Game::mp_select_load_option(char *fileName)
 				if( recvPtr )
 				{
 					trial = MAX(trial, 1000);
-					startTime = m.get_time();
+					startTime = misc.get_time();
 					if( ((MpStructBase *)recvPtr)->msg_id == MPMSG_END_SETTING )
 					{
 						recvEndSetting++;

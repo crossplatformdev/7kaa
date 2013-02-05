@@ -45,6 +45,7 @@ VgaSDL::VgaSDL()
    memset(game_pal, 0, sizeof(SDL_Color)*VGA_PALETTE_SIZE);
    custom_pal = NULL;
    vga_color_table = NULL;
+   video_mode_flags = SDL_HWSURFACE|SDL_HWPALETTE|SDL_DOUBLEBUF;
 }
 //-------- End of function VgaSDL::VgaSDL ----------//
 
@@ -62,34 +63,42 @@ VgaSDL::~VgaSDL()
 
 int VgaSDL::init()
 {
+   SDL_Surface *icon;
+
    if (SDL_Init(SDL_INIT_VIDEO))
       return 0;
 
-   front = SDL_SetVideoMode(VGA_WIDTH, VGA_HEIGHT, VGA_BPP, SDL_HWSURFACE|SDL_HWPALETTE);
+   front = SDL_SetVideoMode(VGA_WIDTH, VGA_HEIGHT, VGA_BPP, video_mode_flags);
    if (!front)
    {
       SDL_Quit();
       return 0;
    }
 
+   icon = SDL_LoadBMP(DEFAULT_DIR_IMAGE "7k_icon.bmp");
+   if (icon)
+   {
+      Uint32 colorkey;
+      colorkey = SDL_MapRGB(icon->format, 0, 0, 0);
+      SDL_SetColorKey(icon, SDL_SRCCOLORKEY, colorkey);
+      SDL_WM_SetIcon(icon, NULL);
+   }
    SDL_WM_SetCaption(WIN_TITLE, WIN_TITLE);
 
    init_pal(DIR_RES"PAL_STD.RES");
 
    // Create the front and back buffers
+   init_back(&vga_front);
+   vga_front.is_front = 1; // set it to 1, overriding the setting in init_back()
    if (sys.debug_session) {
-      init_back(&vga_front);
-      vga_front.is_front = 1; // set it to 1, overriding the setting in init_back()
-      init_front(&vga_true_front);
-      activate_pal(&vga_true_front);
-   } else {
-      init_front(&vga_front);
-      activate_pal(&vga_front);
+      init_back(&vga_true_front);
    }
    init_back(&vga_back);
 
    vga_front.lock_buf();
    vga_back.lock_buf();
+
+   refresh_palette();
 
    return 1;
 }
@@ -131,7 +140,6 @@ int VgaSDL::init_back(VgaBuf *b, unsigned long w, unsigned long h)
    }
 
    SurfaceSDL *wrapper = new SurfaceSDL(surface);
-   SDL_SetPalette(surface, SDL_LOGPAL, game_pal, 0, VGA_PALETTE_SIZE);
    b->init(wrapper, 0);
    return 1;
 }
@@ -150,6 +158,7 @@ void VgaSDL::deinit()
    if (vga_color_table) delete vga_color_table;
    SDL_Quit();
    front = NULL;
+   video_mode_flags = SDL_HWSURFACE|SDL_HWPALETTE;
 }
 //-------- End of function VgaSDL::deinit ----------//
 
@@ -188,15 +197,18 @@ int VgaSDL::init_pal(const char* fileName)
 
 //--------- Start of function VgaSDL::refresh_palette ----------//
 //
-// When the system changes the palette, this function will set
-// the palette back to the correct entries.
+// Update front buffers with the current palette.
 //
 void VgaSDL::refresh_palette()
 {
-   if (custom_pal)
+   SurfaceSDL *fake_front = vga_front.get_buf();
+   if (custom_pal) {
+      fake_front->activate_pal(custom_pal, 0, VGA_PALETTE_SIZE);
       SDL_SetColors(front, custom_pal, 0, VGA_PALETTE_SIZE);
-   else
+   } else {
+      fake_front->activate_pal(game_pal, 0, VGA_PALETTE_SIZE);
       SDL_SetColors(front, game_pal, 0, VGA_PALETTE_SIZE);
+   }
 }
 //----------- End of function VgaSDL::refresh_palette ----------//
 
@@ -207,8 +219,6 @@ void VgaSDL::refresh_palette()
 //
 void VgaSDL::activate_pal(VgaBuf* vgaBufPtr)
 {
-   SurfaceSDL *surface = vgaBufPtr->get_buf();
-   surface->activate_pal(game_pal, 0, VGA_PALETTE_SIZE);
 }
 //--------- End of function VgaSDL::activate_pal ----------//
 
@@ -322,8 +332,16 @@ void VgaSDL::handle_messages()
             sys.need_redraw_flag = 1;
             if (!sys.is_mp_game)
                sys.unpause();
-         } else if (!sys.is_mp_game) {
-            sys.pause();
+
+            // update ctrl/shift/alt key state
+            mouse.update_skey_state();
+            SDL_ShowCursor(SDL_DISABLE);
+         } else {
+            if (!sys.is_mp_game)
+              sys.pause();
+            // turn the system cursor back on to get around a fullscreen
+            // mouse grabbed problem on windows
+            SDL_ShowCursor(SDL_ENABLE);
          }
          break;
       case SDL_QUIT:
@@ -347,28 +365,49 @@ void VgaSDL::flag_redraw()
 //-------- End of function VgaSDL::flag_redraw ----------//
 
 
+//-------- Begin of function VgaSDL::is_full_screen --------//
+//
+int VgaSDL::is_full_screen()
+{
+   return video_mode_flags & SDL_FULLSCREEN;
+}
+//-------- End of function VgaSDL::is_full_screen ----------//
+
 //-------- Begin of function VgaSDL::toggle_full_screen --------//
 //
 // The previous front surface is freed by SDL_SetVideoMode.
 void VgaSDL::toggle_full_screen()
 {
-   static uint32_t flags = SDL_HWSURFACE|SDL_HWPALETTE;
-   flags ^= SDL_FULLSCREEN;
-   front = SDL_SetVideoMode(VGA_WIDTH, VGA_HEIGHT, VGA_BPP, flags);
+   video_mode_flags ^= SDL_FULLSCREEN;
+   front = SDL_SetVideoMode(VGA_WIDTH, VGA_HEIGHT, VGA_BPP, video_mode_flags);
    if (!front)
    {
       // Try to restore the previous mode.
-      flags ^= SDL_FULLSCREEN;
-      front = SDL_SetVideoMode(VGA_WIDTH, VGA_HEIGHT, VGA_BPP, flags);
+      video_mode_flags ^= SDL_FULLSCREEN;
+      front = SDL_SetVideoMode(VGA_WIDTH, VGA_HEIGHT, VGA_BPP, video_mode_flags);
       if (!front)
       {
          ERR("Lost video surface!");
          return;
       }
    }
-   init_front(active_buf);
+   refresh_palette();
    sys.need_redraw_flag = 1;
 }
 //-------- End of function VgaSDL::toggle_full_screen ----------//
 
 
+//-------- Beginning of function VgaSDL::flip ----------//
+void VgaSDL::flip()
+{
+   static Uint32 ticks = 0;
+   Uint32 cur_ticks = SDL_GetTicks();
+   if (cur_ticks > ticks + 5 || cur_ticks < ticks) {
+      SurfaceSDL *tmp = vga_front.get_buf();
+      SDL_Surface *src = tmp->get_surface();
+      ticks = cur_ticks;
+      SDL_BlitSurface(src, NULL, front, NULL);
+      SDL_Flip(front);
+   }
+}
+//-------- End of function VgaSDL::flip ----------//

@@ -137,7 +137,7 @@ void DynArrayB::linkin(void* ent)
    if ( ent )
       memcpy(body_buf+(cur_pos-1)*ele_size, ent, ele_size );
    else
-      *(body_buf+(cur_pos-1)*ele_size) = NULL;
+      *(body_buf+(cur_pos-1)*ele_size) = '\0';
 }
 //---------- END OF FUNCTION DynArrayB::linkin ------------//
 
@@ -208,7 +208,7 @@ enum { DYN_ARRAY_B_RECORD_SIZE = 29 };
 //
 int DynArrayB::write_file(File* filePtr)
 {
-	if (!write_with_record_size(filePtr, this, &visit_dyn_array_b,
+	if (!write_with_record_size(filePtr, this, &visit_dyn_array_b<FileWriterVisitor>,
 										 DYN_ARRAY_B_RECORD_SIZE))
 		return 0;
 
@@ -240,7 +240,7 @@ int DynArrayB::write_file(File* filePtr)
 //
 int DynArrayB::read_file(File* filePtr)
 {
-	if (!read_with_record_size(filePtr, this, &visit_dyn_array_b,
+	if (!read_with_record_size(filePtr, this, &visit_dyn_array_b<FileReaderVisitor>,
 										DYN_ARRAY_B_RECORD_SIZE))
 		return 0;
 

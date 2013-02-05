@@ -127,9 +127,9 @@ void HallFame::disp_info(int x, int y, int pos)
 	#endif
 
 	str  = translate.process("Period : ");
-	str += m.num_to_str(start_year);     // without adding comma separators
+	str += misc.num_to_str(start_year);     // without adding comma separators
 	str += "-";
-	str += m.num_to_str(end_year);
+	str += misc.num_to_str(end_year);
 
 	fontPtr->put( x+260, y2, str );
 
@@ -197,7 +197,7 @@ void HallFame::record_data(int totalScore)
 	Nation* playerNation = ~nation_array;
 
 	strncpy( player_name, playerNation->king_name(), NationArray::HUMAN_NAME_LEN );
-	player_name[NationArray::HUMAN_NAME_LEN] = NULL;
+	player_name[NationArray::HUMAN_NAME_LEN] = '\0';
 
 	race_id	  = playerNation->race_id;
 

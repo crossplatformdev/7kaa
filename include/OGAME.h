@@ -72,9 +72,7 @@ struct ScenInfo
 
 	char* 	file_name;
 	char  	scen_name[SCEN_NAME_LEN+1];
-//#ifdef AMPLUS
 	char		dir_id;			// real path look from DIR_SCENARIO_PATH(dir_id)
-//#endif
 	short		goal_difficulty;
 	short 	goal_score_bonus;
 };
@@ -144,10 +142,12 @@ private:
 	void			view_encyclopedia();
 	void			view_credits();
 
+	int			input_box(const char *tell_string, char *name, int name_len);
+
 	//------- multiplayer game functions -------//
 
 	int 			mp_select_mode(char *saveGameName);
-	int			mp_get_address(char *name, int name_len);
+	int			mp_get_leader_board();
 	int			mp_join_session(int session_id, char *player_name);
 	int			mp_select_option(NewNationPara*, int*);
 	int			mp_select_service();

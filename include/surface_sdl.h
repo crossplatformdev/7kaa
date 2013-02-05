@@ -25,7 +25,7 @@
 #define __SURFACE_SDL_H
 
 #include <stdlib.h>
-#include <SDL/SDL.h>
+#include <SDL.h>
 
 class SurfaceSDL
 {
@@ -59,6 +59,7 @@ public:
 	int   activate_pal(SDL_Color *pal, int firstcolor, int ncolors);
         int   is_buf_lost();
         int   restore_buf();
+	SDL_Surface *get_surface();
 };
 
 typedef SurfaceSDL Surface;

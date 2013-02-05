@@ -35,11 +35,8 @@ enum { COMMON_DATA_BUF_SIZE = 64*1024 };			// keep a 64K common buffer for all t
 
 #define FRAMES_PER_DAY	10			// no. of frames per day
 
-#ifdef AMPLUS
-	#define MAX_SCENARIO_PATH 2
-#else
-	#define MAX_SCENARIO_PATH 1
-#endif
+#define MAX_SCENARIO_PATH 2
+
 
 //------------ sys_flag --------------//
 
@@ -84,12 +81,13 @@ class Sys
 public:
 	char		game_version;			// VERSION_???
 
-	char     paused_flag;    		// whether the game is paused
 	char		sys_flag;
 	char		init_flag;
 	char		signal_exit_flag;
 	char		need_redraw_flag;    // set to 1 if task switched back. After redraw, clear it
+	char		toggle_full_screen_flag;
 	char		cheat_enabled_flag;
+	char		user_pause_flag;
 
 	char 		view_mode;				// the view mode can be MODE_???
 
@@ -128,9 +126,7 @@ public:
 	char    dir_config[MAX_PATH+1];
 	char  	dir_image[MAX_PATH+1];
 	char  	dir_encyc[MAX_PATH+1];
-#ifdef AMPLUS
 	char  	dir_encyc2[MAX_PATH+1];
-#endif
 	char  	dir_music[MAX_PATH+1];
 	char  	dir_movie[MAX_PATH+1];
 	char  	dir_tutorial[MAX_PATH+1];
@@ -190,7 +186,8 @@ public:
 	//---- for setting game directories ----//
 
 	int 		set_config_dir();
-	void 		set_game_dir();
+	int		chdir_to_game_dir();
+	int		set_game_dir();
 
 	//-------- for load/save games --------//
 

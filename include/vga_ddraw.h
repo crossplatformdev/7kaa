@@ -66,12 +66,14 @@ public:
 
 	void   handle_messages();
 	void   flag_redraw();
+	int    is_full_screen();
 	void   toggle_full_screen();
 
 	// DDraw private
 	Surface* create_surface(LPDDSURFACEDESC ddsd);
 	void refresh_palette();
 	int restore();
+	void   flip();
 
 private:
 	int    init_dd();

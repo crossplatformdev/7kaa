@@ -305,9 +305,7 @@ void Bullet::hit_target(short x, short y)
 		case SPRITE_READY_TO_MOVE:
 		case SPRITE_TURN:
 		case SPRITE_MOVE:
-// #ifdef AMPLUS
 		case SPRITE_ATTACK:
-// #endif
 			// ####### begin Gilbert 9/9 #######//
 			// check if on the opposite direction
 			if( (targetUnit->cur_dir & 7)== ((cur_dir + 4 ) & 7)
@@ -574,7 +572,6 @@ int Bullet::warn_target()
 								unitPtr->set_guard_on();
 							}
 							break;
-#ifdef AMPLUS
 						case SPRITE_ATTACK:
 							if( unitPtr->can_attack_guard() && !unitPtr->is_guarding()
 								&& unitPtr->remain_attack_delay >= GUARD_COUNT_MAX
@@ -587,7 +584,6 @@ int Bullet::warn_target()
 								unitPtr->set_guard_on();
 							}
 							break;
-#endif
 						}
 					}
 				}
@@ -614,7 +610,7 @@ char Bullet::display_layer()
 //------- Begin of function Bullet::attenuated_damage -----//
 float	Bullet::attenuated_damage(short curX, short curY)
 {
-	short d = m.points_distance(curX, curY, target_x_loc * ZOOM_LOC_WIDTH, target_y_loc * ZOOM_LOC_HEIGHT);
+	short d = misc.points_distance(curX, curY, target_x_loc * ZOOM_LOC_WIDTH, target_y_loc * ZOOM_LOC_HEIGHT);
 	// damage drops from attack_damage to attack_damage/2, as range drops from 0 to damage_radius
 	err_when(damage_radius == 0);
 	if( d > damage_radius)

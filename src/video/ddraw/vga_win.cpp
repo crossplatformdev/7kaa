@@ -21,6 +21,7 @@
 
 #include <OSYS.h>
 #include <OVGA.h>
+#include <OMOUSE.h>
 #include <RESOURCE.h>
 #include <dbglog.h>
 
@@ -97,8 +98,8 @@ void VgaDDraw::destroy_window()
    {
       ShowWindow(sys.main_hwnd, SW_MINIMIZE );
 
-      unsigned curTime = m.get_time();
-      while( m.get_time() < curTime + 4000 );
+      unsigned curTime = misc.get_time();
+      while( misc.get_time() < curTime + 4000 );
    }
 */
    //---------------------------------------//
@@ -156,6 +157,9 @@ static long FAR PASCAL main_win_proc(HWND hWnd, UINT message, WPARAM wParam, LPA
                sys.need_redraw_flag = 1; // for Sys::disp_frame to redraw the screen
                if (!sys.is_mp_game)
                   sys.unpause();
+
+               // update ctrl/shift/alt key state
+               mouse.update_skey_state();
             } else {
                // The screen wasn't restored. The game is not usable.
                ERR("Lost buffers in main_win_proc!\n");
@@ -235,6 +239,15 @@ void VgaDDraw::flag_redraw()
    InvalidateRect(main_hwnd, NULL, TRUE);
 }
 //-------- End of function VgaDDraw::flag_redraw ----------//
+
+
+//-------- Begin of function VgaDDraw::is_full_screen --------//
+//
+int VgaDDraw::is_full_screen()
+{
+   return 0;
+}
+//-------- End of function VgaDDraw::is_full_screen ----------//
 
 
 //-------- Begin of function VgaDDraw::toggle_full_screen --------//

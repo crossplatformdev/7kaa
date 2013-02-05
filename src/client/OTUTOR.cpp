@@ -191,8 +191,8 @@ void Tutor::load_tutor_info()
 		tutorRec  = (TutorRec*) dbTutor.read(i+1);
 		tutorInfo = tutor_info_array+i;
 
-		m.rtrim_fld( tutorInfo->code, tutorRec->code, tutorRec->CODE_LEN );
-		m.rtrim_fld( tutorInfo->des , tutorRec->des , tutorRec->DES_LEN  );
+		misc.rtrim_fld( tutorInfo->code, tutorRec->code, tutorRec->CODE_LEN );
+		misc.rtrim_fld( tutorInfo->des , tutorRec->des , tutorRec->DES_LEN  );
 #if(defined(GERMAN) || defined(FRENCH) || defined(SPANISH))
 		translate.multi_to_win(tutorInfo->des, tutorInfo->DES_LEN);
 #endif
@@ -267,11 +267,11 @@ void Tutor::load(int tutorId)
 			tokenStr = fileTxt.get_token(1);
 
 			strncpy( tutorTextBlock->button_code, tokenStr, tutorTextBlock->BUTTON_CODE_LEN );
-			tutorTextBlock->button_code[tutorTextBlock->BUTTON_CODE_LEN] = NULL;
+			tutorTextBlock->button_code[tutorTextBlock->BUTTON_CODE_LEN] = '\0';
 		}
 		else
 		{
-			tutorTextBlock->button_code[0] = NULL;
+			tutorTextBlock->button_code[0] = '\0';
 		}
 
 		//------- read in the tutorial text -------//
@@ -374,7 +374,7 @@ void Tutor::run(int tutorId, int inGameCall)
 		str += tutor[tutorId]->code;
 		str += ".TUT";
 
-		if( m.is_file_exist(str) )
+		if( misc.is_file_exist(str) )
 		{
 			game_file.load_game("", str);
 		}
@@ -383,7 +383,7 @@ void Tutor::run(int tutorId, int inGameCall)
 			str = DIR_TUTORIAL;
 			str += "STANDARD.TUT";
 
-			if( m.is_file_exist(str) )
+			if( misc.is_file_exist(str) )
 				game_file.load_game("", str);
 		}
 
@@ -527,7 +527,7 @@ void Tutor::play_speech()
 
 	str += cur_text_block_id;
 
-	if( !m.is_file_exist(str) )
+	if( !misc.is_file_exist(str) )
 		return;
 
 	// ##### begin Gilbert 25/9 ######//

@@ -655,10 +655,8 @@ void Unit::target_move(Unit* targetUnit)
 				err_when(range_attack_x_loc==-1 || range_attack_y_loc==-1);
 
 				set_attack_dir(curXLoc, curYLoc, range_attack_x_loc, range_attack_y_loc);
-#ifdef AMPLUS
 				cycle_eqv_attack();
 				attackInfo = attack_info_array + cur_attack;	// cur_attack may change
-#endif
 				cur_frame  = 1;
 
 				if(is_dir_correct())
@@ -906,7 +904,7 @@ int Unit::detect_surround_target()
 	
 	for(int i=2; i<=CHECK_SIZE; ++i)
 	{
-		m.cal_move_around_a_point(i, DIMENSION, DIMENSION, xShift, yShift);
+		misc.cal_move_around_a_point(i, DIMENSION, DIMENSION, xShift, yShift);
       checkXLoc = curXLoc+xShift;
       checkYLoc = curYLoc+yShift;
       if(checkXLoc<0 || checkXLoc>=MAX_WORLD_X_LOC || checkYLoc<0 || checkYLoc>=MAX_WORLD_Y_LOC)

@@ -64,7 +64,7 @@ void Translate::init()
 {
    //---- read the whole file into the buf --------//
 
-   if( !m.is_file_exist(TRANSLATE_FILE_NAME) )
+   if( !misc.is_file_exist(TRANSLATE_FILE_NAME) )
       return;
 
 	File fileTranslate;
@@ -109,13 +109,13 @@ void Translate::init()
    {
       if( *textPtr == '|' )
       {
-			*textPtr = NULL;	// Nullify the sentence
+			*textPtr = '\0';	// Nullify the sentence
 			translate_table[recNo-1].to_text_ptr = textPtr+1;
       }
 
       if( *textPtr == '~' )
       {
-			*textPtr = NULL;	// Nullify the sentence
+			*textPtr = '\0';	// Nullify the sentence
 
 			recNo++;
 

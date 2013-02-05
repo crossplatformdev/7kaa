@@ -85,12 +85,12 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 
 	if( defenseMode )		// only for defense mode, for attack mission, we should plan and organize it better
 	{
-		int originalTargetCombatLevel;
+		int originalTargetCombatLevel = targetCombatLevel;
 
 		targetCombatLevel = ai_attack_order_nearby_mobile(targetXLoc, targetYLoc, targetCombatLevel);
 
 		if( targetCombatLevel < 0 )		// the mobile force alone can finish all the enemies
-			return originalTargetCombatLevel;
+			return originalTargetCombatLevel - targetCombatLevel;
 	}
 
 	//--- try to send troop with maxTargetCombatLevel, and don't send troop if available combat level < minTargetCombatLevel ---//
@@ -187,7 +187,7 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 
 					if( firmCamp->worker_count == MAX_WORKER )		// the king shouldn't go out alone
 					{
-						if( m.points_distance(firmCamp->center_x, firmCamp->center_y,
+						if( misc.points_distance(firmCamp->center_x, firmCamp->center_y,
 							 targetXLoc, targetYLoc) <= EFFECTIVE_FIRM_TOWN_DISTANCE )
 						{
 							kingFirmRecno = 0;
@@ -432,7 +432,7 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 
 		err_when( firmPtr->nation_recno != nation_recno );
 
-		attack_camp_array[i].distance = m.points_distance( firmPtr->center_x, firmPtr->center_y,
+		attack_camp_array[i].distance = misc.points_distance( firmPtr->center_x, firmPtr->center_y,
 												targetXLoc, targetYLoc );
 
 		err_when( attack_camp_array[i].distance < 0 );
@@ -489,7 +489,7 @@ int Nation::ai_attack_order_nearby_mobile(int targetXLoc, int targetYLoc, int ta
 
 	for( int i=2 ; i<scanRange*scanRange ; i++ )
 	{
-		m.cal_move_around_a_point(i, scanRange, scanRange, xOffset, yOffset);
+		misc.cal_move_around_a_point(i, scanRange, scanRange, xOffset, yOffset);
 
 		xLoc = targetXLoc + xOffset;
 		yLoc = targetYLoc + yOffset;
@@ -698,7 +698,7 @@ void Nation::ai_attack_target_execute(int directAttack)
 
 		//------- remove this from attack_camp_array -------//
 
-		m.del_array_rec(attack_camp_array, attack_camp_count, sizeof(AttackCamp), i+1 );
+		misc.del_array_rec(attack_camp_array, attack_camp_count, sizeof(AttackCamp), i+1 );
 		attack_camp_count--;
 	}
 }
@@ -813,26 +813,33 @@ int Nation::think_secret_attack()
 
 	//---------------------------------------------//
 
-	int     curRating=0, bestRating=0, bestNationRecno=0;
+	int bestRating = 0;
+	int bestNationRecno = 0;
 	int     ourMilitary = military_rank_rating();
-	int     relationStatus, tradeRating;
 	Nation* nationPtr;
-	NationRelation* nationRelation;
 
 	for( int i=1 ; i<=nation_array.size() ; i++ )
 	{
+		int tradeRating;
+		int curRating;
+		NationRelation *nationRelation;
+
 		if( nation_array.is_deleted(i) || nation_recno == i )
 			continue;
 
 		nationPtr = nation_array[i];
 
 		nationRelation = get_relation(i);
-		relationStatus = nationRelation->status;
+
+		tradeRating = trade_rating(i)/2 +        // existing trade
+			      ai_trade_with_rating(i)/2; // possible trade
 
 		//---- if the secret attack flag is not enabled yet ----//
 
 		if( !nationRelation->ai_secret_attack )
 		{
+			int relationStatus = nationRelation->status;
+
 			//---- if we have a friendly treaty with this nation ----//
 
 			if( relationStatus == NATION_FRIENDLY )
@@ -849,9 +856,6 @@ int Nation::think_secret_attack()
 			}
 
 			//---- don't attack if we have a big trade volume with the nation ---//
-
-			tradeRating = trade_rating(i)/2 +      		// existing trade
-							  ai_trade_with_rating(i)/2;		// possible trade
 
 			if( tradeRating > (50-pref_trading_tendency/2) )	// 0 to 50, 0 if trade tendency is 100, it is 0
 			{

@@ -41,6 +41,10 @@
 #include <OMUSIC.h>
 #include <dbglog.h>
 
+#ifndef NO_WINDOWS
+#include <objbase.h>
+#endif
+
 DBGLOG_DEFAULT_CHANNEL(GameFile);
 
 // -------- define constant ----------//
@@ -64,7 +68,7 @@ int GameFile::save_game(const char* fileName)
 
 	int rc = 1;
 
-	if (!m.path_cat(full_path, sys.dir_config, file_name, MAX_PATH))
+	if (!misc.path_cat(full_path, sys.dir_config, file_name, MAX_PATH))
 	{
 		rc = 0;
 		errStr = "Path too long to the saved game";
@@ -81,7 +85,7 @@ int GameFile::save_game(const char* fileName)
 	{
 		DWORD freeSpace = DWORD( (double)freeCluster * sectorPerCluster * bytePerSector / 1024.0);
 
-		if( m.is_file_exist(file_name) )
+		if( misc.is_file_exist(file_name) )
 		{	
 			// if overwritting existing file, count the file size of the existing file
 			file.file_open(file_name);
@@ -170,7 +174,7 @@ int GameFile::load_game(const char *base_path, char* fileName)
 
 	rc = 1;
 
-	if (!m.path_cat(full_path, base_path, file_name, MAX_PATH))
+	if (!misc.path_cat(full_path, base_path, file_name, MAX_PATH))
 	{
 		rc = 0;
 		errMsg = "Path too long to the saved game";
@@ -296,7 +300,7 @@ void GameFile::set_file_name()
 
 	for( i=0 ; i<(int) strlen(baseName) && (int) str.len() < NAME_PREFIX_LEN ; i++ )
 	{
-		nameChar = m.upper(baseName[i]);
+		nameChar = misc.upper(baseName[i]);
 
 		if( ( nameChar >= 'A' && nameChar <= 'Z' ) ||
 			 ( nameChar >= '0' && nameChar <= '9' ) )
@@ -356,7 +360,7 @@ void GameFile::set_file_name()
 
 	strncpy( file_name, str, MAX_PATH );
 
-	file_name[MAX_PATH] = NULL;
+	file_name[MAX_PATH] = '\0';
 }
 //--------- End of function GameFile::set_file_name -------//
 
@@ -371,9 +375,9 @@ void GameFile::save_process()
 {
    //--------- set the total playing time --------//
 
-	info.total_play_time += m.get_time()-info.start_play_time;
+	info.total_play_time += misc.get_time()-info.start_play_time;
 
-   info.start_play_time  = m.get_time();
+   info.start_play_time  = misc.get_time();
 }
 //--------- End of function GameFile::save_process -------//
 
@@ -386,7 +390,7 @@ void GameFile::save_process()
 //
 void GameFile::load_process()
 {
-	info.start_play_time = m.get_time();       // the time player start playing the game
+	info.start_play_time = misc.get_time();       // the time player start playing the game
 	config.disable_ai_flag = 0;
 
 	//-- if the player is in the diplomatic message screen, rebuild the talk choice list --//
@@ -427,7 +431,7 @@ int GameFile::write_game_header(File* filePtr)
 	Nation* playerNation = ~nation_array;
 
 	strncpy( player_name, playerNation->king_name(), NationArray::HUMAN_NAME_LEN );
-	player_name[NationArray::HUMAN_NAME_LEN] = NULL;
+	player_name[NationArray::HUMAN_NAME_LEN] = '\0';
 
 	race_id 		 = playerNation->race_id;
 	nation_color = playerNation->nation_color;

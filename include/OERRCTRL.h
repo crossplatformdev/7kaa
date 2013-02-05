@@ -42,22 +42,18 @@ struct EcMsgHeader
 	}
 };
 
-class MultiPlayerType;
+class MultiPlayer;
 
 class ErrorControl
 {
 	enum { FIRST_SEND, RE_SEND, ACKNOW, NEGACK };
-#ifdef AMPLUS
 //	enum { MAX_PLAYER = MAX_NATION, MAX_QUEUE = 12, MAX_RECV_QUEUE = 48 };
 	enum { MAX_PLAYER = MAX_NATION, MAX_QUEUE = 18, MAX_RECV_QUEUE = 72 };
-#else
-	enum { MAX_PLAYER = MAX_NATION, MAX_QUEUE = 8, MAX_RECV_QUEUE = 32 };
-#endif
 	// MAX_QUEUE/2 > Remote::MAX_PROCESS_FRAME_DELAY
 	// MAX_RECV_QUEUE > MAX_QUEUE/2 * MAX_PLAYER
 
 private:
-	MultiPlayerType *mp_ptr;
+	MultiPlayer *mp_ptr;
 	int	connecting_player_count;				// no. of peers
 	char	self_ec_player_id;
 
@@ -116,7 +112,7 @@ private:
 	int	need_re_send(char frameId, int promptFactor);
 
 public:
-	void	init(MultiPlayerType *, char ecPlayerId );
+	void	init(MultiPlayer *mp, char ecPlayerId);
 	void	deinit();
 	void	set_dp_id(char ecPlayerId, unsigned long dpPlayerId );
 	char	get_ec_player_id( unsigned long dpPlayerId );

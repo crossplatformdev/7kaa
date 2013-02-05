@@ -47,11 +47,9 @@ void UnitGod::init_derived()
 		unit_id==UNIT_KUKULCAN || unit_id==UNIT_JAPANESE_GOD)
 		can_attack_flag = 0; // unable to attack
 
-#ifdef AMPLUS
 	if(unit_id==UNIT_EGYPTIAN_GOD || unit_id==UNIT_INDIAN_GOD ||
 		unit_id==UNIT_ZULU_GOD)
 		can_attack_flag = 0; // unable to attack
-#endif
 }
 //-------- End of function UnitGod::init_derived -------//
 
@@ -168,7 +166,6 @@ void UnitGod::disp_info(int refreshFlag)
 				buttonName = "GODRAIN";
 				break;
 
-#ifdef AMPLUS
 			case GOD_EGYPTIAN:
 				buttonName = "GODEGYPT";
 				break;
@@ -180,7 +177,6 @@ void UnitGod::disp_info(int refreshFlag)
 			case GOD_ZULU:
 				buttonName = "GODZULU";
 				break;
-#endif
 
 			default:
 				err_here();
@@ -397,10 +393,8 @@ void UnitGod::cast_on_loc(int castXLoc, int castYLoc)
 	{
 		Firm* firmPtr = firm_array[ locPtr->firm_recno() ];
 		int	divider = (firmPtr->loc_x2-firmPtr->loc_x1+1) * (firmPtr->loc_y2-firmPtr->loc_y1+1);
-#ifdef AMPLUS
 		if( god_id == GOD_ZULU )
 			divider = 1;		// range of zulu god is 1, no need to divide
-#endif
 
 		if( firmPtr->overseer_recno )
 		{
@@ -433,7 +427,7 @@ void UnitGod::cast_on_loc(int castXLoc, int castYLoc)
 				if( townPtr->race_pop_array[i]==0 )
 					continue;
 
-				float changePoints = (float)7 + m.random(8);		// decrease 7 to 15 loyalty points instantly
+				float changePoints = (float)7 + misc.random(8);		// decrease 7 to 15 loyalty points instantly
 
 				if( townPtr->nation_recno )
 					townPtr->change_loyalty(i+1, -changePoints/divider);
@@ -441,7 +435,6 @@ void UnitGod::cast_on_loc(int castXLoc, int castYLoc)
 					townPtr->change_resistance(i+1, nation_recno, -changePoints/divider);
 			}
 		}
-#ifdef AMPLUS
 		else if( god_id == GOD_EGYPTIAN && townPtr->nation_recno == nation_recno)
 		{
 			int headCount;
@@ -453,7 +446,6 @@ void UnitGod::cast_on_loc(int castXLoc, int castYLoc)
 				townPtr->inc_pop(raceId, 0, (int)townPtr->race_loyalty_array[raceId-1]);
 			}
 		}
-#endif
 	}
 }
 //---------- End of function UnitGod::cast_on_loc ----------//
@@ -480,7 +472,6 @@ void UnitGod::cast_on_unit(int unitRecno, int divider)
 			maya_cast_power( unitRecno, divider );
 			break;
 
-#ifdef AMPLUS
 		case GOD_EGYPTIAN:
 			egyptian_cast_power( unitRecno, divider);
 			break;
@@ -492,7 +483,6 @@ void UnitGod::cast_on_unit(int unitRecno, int divider)
 		case GOD_ZULU:
 			zulu_cast_power( unitRecno, divider);
 			break;
-#endif
 
 		default:
 			err_here();
@@ -521,7 +511,6 @@ void UnitGod::cast_on_worker(Worker* workerPtr, int nationRecno, int divider)
 			maya_cast_power( workerPtr, nationRecno, divider );
 			break;
 
-#ifdef AMPLUS
 		case GOD_EGYPTIAN:
 			egyptian_cast_power(workerPtr, nationRecno, divider);
 			break;
@@ -533,7 +522,6 @@ void UnitGod::cast_on_worker(Worker* workerPtr, int nationRecno, int divider)
 		case GOD_ZULU:
 			zulu_cast_power(workerPtr, nationRecno, divider);
 			break;
-#endif
 
 		default:
 			err_here();
@@ -552,7 +540,7 @@ void UnitGod::persian_cast_power(int unitRecno, int divider)
 
 	if( unitPtr->nation_recno == nation_recno && unitPtr->race_id > 0 )
 	{
-		float changePoints = (float) unitPtr->max_hit_points / (6+m.random(4));	 // divided by (6 to 9)
+		float changePoints = (float) unitPtr->max_hit_points / (6+misc.random(4));	 // divided by (6 to 9)
 
 		changePoints = MAX( changePoints, 10 );
 
@@ -572,7 +560,7 @@ void UnitGod::japanese_cast_power(int unitRecno, int divider)
 
 	if( unitPtr->nation_recno != nation_recno && unitPtr->race_id > 0 )
 	{
-		int changePoints = 7 + m.random(8);		// decrease 7 to 15 loyalty points instantly
+		int changePoints = 7 + misc.random(8);		// decrease 7 to 15 loyalty points instantly
 
 		unitPtr->change_loyalty( -MAX(1, changePoints/divider) );
 	}
@@ -590,7 +578,7 @@ void UnitGod::maya_cast_power(int unitRecno, int divider)
 
 	if( unitPtr->nation_recno == nation_recno && unitPtr->race_id == RACE_MAYA )
 	{
-		int changePoints = 15 + m.random(10);		// add 15 to 25 points to its combat level instantly
+		int changePoints = 15 + misc.random(10);		// add 15 to 25 points to its combat level instantly
 
 		int newCombatLevel = unitPtr->skill.combat_level + changePoints/divider;
 
@@ -615,7 +603,7 @@ void UnitGod::persian_cast_power(Worker* workerPtr, int nationRecno, int divider
 
 	if( nationRecno == nation_recno && workerPtr->race_id > 0 )
 	{
-		int changePoints = workerPtr->max_hit_points() / (4+m.random(4));	 // divided by (4 to 7)
+		int changePoints = workerPtr->max_hit_points() / (4+misc.random(4));	 // divided by (4 to 7)
 
 		changePoints = MAX( changePoints, 10 );
 
@@ -633,7 +621,7 @@ void UnitGod::japanese_cast_power(Worker* workerPtr, int nationRecno, int divide
 
 	if( nationRecno != nation_recno && workerPtr->race_id > 0 )
 	{
-		int changePoints = 7 + m.random(8);		// decrease 7 to 15 loyalty points instantly
+		int changePoints = 7 + misc.random(8);		// decrease 7 to 15 loyalty points instantly
 
 		workerPtr->change_loyalty( -MAX(1, changePoints/divider) );
 	}
@@ -649,7 +637,7 @@ void UnitGod::maya_cast_power(Worker* workerPtr, int nationRecno, int divider)
 
 	if( nationRecno == nation_recno && workerPtr->race_id == RACE_MAYA )
 	{
-		int changePoints = 15 + m.random(10);		// add 15 to 25 points to its combat level instantly
+		int changePoints = 15 + misc.random(10);		// add 15 to 25 points to its combat level instantly
 
 		int newCombatLevel = workerPtr->combat_level + MAX(1, changePoints/divider);
 
@@ -680,7 +668,6 @@ void UnitGod::consume_power_pray_points()
 //---------- End of function UnitGod::consume_power_pray_points ----------//
 
 
-#ifdef AMPLUS
 
 //--------- Begin of function UnitGod::egyptian_cast_power ---------//
 //
@@ -698,7 +685,7 @@ void UnitGod::indian_cast_power(int unitRecno, int divider)
 
 	if( unitPtr->is_visible() && nation_array.should_attack(nation_recno, unitPtr->nation_recno) )
 	{
-		unitPtr->change_loyalty(-30 + m.random(11));
+		unitPtr->change_loyalty(-30 + misc.random(11));
 	}
 }
 //---------- End of function UnitGod::indian_cast_power ----------//
@@ -760,4 +747,3 @@ void UnitGod::zulu_cast_power(Worker *workerPtr, int nationRecno, int divider)
 	// no effect
 }
 //---------- End of function UnitGod::zulu_cast_power ----------//
-#endif

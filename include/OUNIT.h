@@ -32,10 +32,6 @@
 #include <OSPATH.h>
 #endif
 
-//#ifndef __OSPATHS2_H
-//#include <OSPATHS2.h>
-//#endif
-
 #ifndef __OUNITRES_H
 #include <OUNITRES.h>
 #endif
@@ -548,9 +544,8 @@ public:
 
 	int   can_stand_guard()  { return can_guard_flag & 1;}
 	int   can_move_guard()  { return can_guard_flag & 2;}
-// #ifdef AMPLUS
 	int   can_attack_guard()  { return can_guard_flag & 4;}
-// #endif
+
 	int   firm_can_assign(short firmRecno);
 
 	void  set_idle();

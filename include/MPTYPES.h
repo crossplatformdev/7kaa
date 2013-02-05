@@ -27,23 +27,13 @@
 
 #include <stdint.h>
 
-#if defined(USE_NONETPLAY)
-	#define PID_TYPE uint32_t
-	#define BROADCAST_PID 0
-	#define MultiPlayerType MultiPlayerNone
-	#define mp_obj mp_none
-	#define SessionIdType uint32_t
-	#define PlayerDesc NonePlayer
-#elif defined(USE_SDLNET)
-	#define PID_TYPE uint32_t
-	#define BROADCAST_PID 0
-	#define MultiPlayerType MultiPlayerSDL
-	#define mp_obj mp_sdl
-	#define SessionIdType uint32_t
-	#define PlayerDesc SDLPlayer
-#else
-	#error "A netplay backend must be specified."
-#endif
+#define PID_TYPE uint32_t
+#define BROADCAST_PID 0
+#define SessionIdType uint32_t
+
+#define MP_FRIENDLY_NAME_LEN 64
+// NOTE: MP_PLAYER_NAME_LEN must match PLAYER_NAME_LEN in OCONFIG.h
+#define MP_PLAYER_NAME_LEN 20
 
 #endif
 

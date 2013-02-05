@@ -132,7 +132,7 @@ void DynArray::linkin(void* ent)
    if ( ent )
       memcpy(body_buf+(cur_pos-1)*ele_size, ent, ele_size );
    else
-      *(body_buf+(cur_pos-1)*ele_size) = NULL;
+      *(body_buf+(cur_pos-1)*ele_size) = '\0';
 }
 
 //---------- END OF FUNCTION DynArray::linkin ------------//
@@ -181,7 +181,7 @@ void DynArray::insert(void* ent)
    if ( ent )
       memcpy(body_buf+(cur_pos-1)*ele_size, ent, ele_size );
    else
-      *(body_buf+(cur_pos-1)*ele_size) = NULL;
+      *(body_buf+(cur_pos-1)*ele_size) = '\0';
 }
 
 //---------- END OF FUNCTION DynArray::insert ------------//
@@ -216,7 +216,7 @@ void DynArray::insert_at(int insertPos, void* ent)
 	if ( ent )
 		memcpy(body_buf+(insertPos-1)*ele_size, ent, ele_size );
 	else
-		*(body_buf+(insertPos-1)*ele_size) = NULL;
+		*(body_buf+(insertPos-1)*ele_size) = '\0';
 }
 
 //---------- END OF FUNCTION DynArray::insert_at ------------//
@@ -270,7 +270,7 @@ void DynArray::update(void* bodyPtr, int recNo)
    if( bodyPtr )
       memcpy(body_buf+(recNo-1)*ele_size, bodyPtr, ele_size );
    else
-      *(body_buf+(recNo-1)*ele_size) = NULL;
+      *(body_buf+(recNo-1)*ele_size) = '\0';
 }
 //----------- END OF FUNCTION DynArray::update ---------//
 
@@ -392,7 +392,7 @@ int DynArray::compare(void* varChar,int varOff,char varType)
          if( bodyStr == (char*) varChar )   // the pointer is the same
             return 1;
          else
-            return m.str_cmp(bodyStr, (char*) varChar);    // m1strcmp with exact set off
+            return misc.str_cmp(bodyStr, (char*) varChar);    // m1strcmp with exact set off
 
       case 'c' :
          return *(bodyPtr + varOff ) == *((char*)varChar);
@@ -404,7 +404,7 @@ int DynArray::compare(void* varChar,int varOff,char varType)
          return *((double*)(bodyPtr+varOff)) == *((double*)varChar);
    }
 
-   return NULL;
+   return 0;
 }
 
 //-------- END OF FUNCTION DynArray::compare ----------//
@@ -501,7 +501,7 @@ enum { DYN_ARRAY_RECORD_SIZE = 29 };
 //
 int DynArray::write_file(File* filePtr)
 {
-	if (!write_with_record_size(filePtr, this, &visit_dyn_array,
+	if (!write_with_record_size(filePtr, this, &visit_dyn_array<FileWriterVisitor>,
 										 DYN_ARRAY_RECORD_SIZE))
 		return 0;
 
@@ -528,7 +528,7 @@ int DynArray::write_file(File* filePtr)
 //
 int DynArray::read_file(File* filePtr)
 {
-	if (!read_with_record_size(filePtr, this, &visit_dyn_array,
+	if (!read_with_record_size(filePtr, this, &visit_dyn_array<FileReaderVisitor>,
 										DYN_ARRAY_RECORD_SIZE))
 		return 0;
 

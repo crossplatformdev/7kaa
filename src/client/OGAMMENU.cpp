@@ -250,9 +250,9 @@ static int detect_game_option()
 			}
 			break;
 
-		case 7:		// quit to Windows
+		case 7:
 			if( !nation_array.player_recno ||
-				 box.ask( "Do you really want to quit to Windows?", "Yes", "No", 130, 400 ) )
+				 box.ask( "Do you really want to quit Seven Kingdoms?", "Yes", "No", 178, 388 ) )
 			{
 				if( remote.is_enable() && nation_array.player_recno )
 				{

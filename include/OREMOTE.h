@@ -320,7 +320,7 @@ public:
 
 //----------- Define class Remote -----------//
 
-class MultiPlayerType;
+class MultiPlayer;
 
 class Remote
 {
@@ -330,12 +330,8 @@ public:
 			 SEND_QUEUE_BUF_INC_SIZE 	 = 1024,			// If the queue is full, expand with this size
 			 RECEIVE_QUEUE_BUF_SIZE		 = 8192, 		// The default queue buffer size
 			 RECEIVE_QUEUE_BUF_INC_SIZE = 2048,			// If the queue is full, expand with this size
-#ifdef AMPLUS
 //			 MAX_PROCESS_FRAME_DELAY = 5,					// process player action 1 frame later
 			 MAX_PROCESS_FRAME_DELAY = 8,					// process player action 1 frame later
-#else
-			 MAX_PROCESS_FRAME_DELAY = 1,					// process player action 1 frame later
-#endif
 			 SEND_QUEUE_BACKUP = MAX_PROCESS_FRAME_DELAY+4,
 			 RECEIVE_QUEUE_BACKUP = (MAX_PROCESS_FRAME_DELAY+1)*2,
 		  };
@@ -346,7 +342,7 @@ public:
 	int				connectivity_mode;
 	int				poll_msg_flag;
 	//	Wsock*			wsock_ptr;
-	MultiPlayerType*	mp_ptr;
+	MultiPlayer *mp_ptr;
 
 	//--------- send queue -----------//
 
@@ -408,7 +404,7 @@ public:
 	Remote();
 	~Remote();
 
-	void			init(MultiPlayerType *);
+	void			init(MultiPlayer *mp);
 	void			deinit();
 
 	void			init_start_mp();

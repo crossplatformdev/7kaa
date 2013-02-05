@@ -353,7 +353,7 @@ int OpenALAudio::play_wav(char *file_name, const DsVolume &vol)
 
    MSG("play_wav(\"%s\")\n", file_name);
 
-   if (m.is_file_exist(file_name))
+   if (misc.is_file_exist(file_name))
       return this->play_long_wav(file_name, vol);
 
    idx = this->wav_res.get_index(file_name);
@@ -1077,5 +1077,11 @@ void OpenALAudio::StreamContext::stop()
    {
       alSourceUnqueueBuffers(this->source, 1, &buf);
       alDeleteBuffers(1, &buf);
+   }
+
+   if (this->stream)
+   {
+      delete this->stream;
+      this->stream = NULL;
    }
 }
